@@ -17,6 +17,10 @@ const supervisorTasks = document.getElementById('supervisor-tasks');
 const workerTasks = document.getElementById('worker-tasks');
 const logoutBtns = document.querySelectorAll('.logout-btn');
 const toastContainer = document.getElementById('toast-container');
+const taskImageInput = document.getElementById('task-image');
+const fileNameDisplay = document.getElementById('file-name-display');
+const imagePreview = document.getElementById('image-preview');
+const submitTaskBtn = document.getElementById('submit-task-btn');
 
 // Event Listeners
 document.addEventListener('DOMContentLoaded', init);
@@ -31,15 +35,44 @@ loginForm.addEventListener('submit', (e) => {
     }
 });
 
-addTaskForm.addEventListener('submit', (e) => {
+addTaskForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const title = document.getElementById('task-title').value.trim();
     const worker = document.getElementById('worker-select').value;
     const priority = document.querySelector('input[name="priority"]:checked').value;
+    const file = taskImageInput.files[0];
 
     if (title && worker) {
-        addTask(title, worker, priority);
+        // Disable button during upload
+        submitTaskBtn.disabled = true;
+        submitTaskBtn.innerHTML = '<span class="material-icons-round">hourglass_empty</span> Yükleniyor...';
+
+        await addTask(title, worker, priority, file);
+
         addTaskForm.reset();
+        imagePreview.style.display = 'none';
+        imagePreview.src = '';
+        fileNameDisplay.textContent = 'Fotoğraf Ekle (Opsiyonel)';
+
+        submitTaskBtn.disabled = false;
+        submitTaskBtn.innerHTML = '<span class="material-icons-round">add_task</span> Görevi Gönder';
+    }
+});
+
+taskImageInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        fileNameDisplay.textContent = file.name;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            imagePreview.src = e.target.result;
+            imagePreview.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    } else {
+        fileNameDisplay.textContent = 'Fotoğraf Ekle (Opsiyonel)';
+        imagePreview.style.display = 'none';
+        imagePreview.src = '';
     }
 });
 
@@ -99,13 +132,60 @@ function switchScreen(screenName) {
     screens[screenName].classList.add('active');
 }
 
-async function addTask(title, worker, priority) {
+// Resizes and converts image to base64
+function compressImage(file, maxWidth = 800) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                if (width > maxWidth) {
+                    height = Math.round((height * maxWidth) / width);
+                    width = maxWidth;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // Compress to JPEG with 0.7 quality to keep size small enough for Firestore
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                resolve(dataUrl);
+            };
+            img.onerror = error => reject(error);
+        };
+        reader.onerror = error => reject(error);
+    });
+}
+
+async function addTask(title, worker, priority, file = null) {
+    let imageUrl = null;
+
+    // Convert image to base64 if selected
+    if (file) {
+        try {
+            imageUrl = await compressImage(file);
+        } catch (error) {
+            console.error("Error processing image:", error);
+            showToast('Resim işlenemedi, sadece metin eklenecek.', 'error');
+        }
+    }
+
     const newTask = {
         title,
         worker,
         priority,
         status: 'pending',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        imageUrl: imageUrl, // Save image URL if exists
+        completedImageUrl: null
     };
 
     try {
@@ -189,6 +269,22 @@ function renderSupervisorTasks() {
 
         const timeString = new Date(task.timestamp).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
 
+        let imageHtml = '';
+        if (task.imageUrl) {
+            imageHtml = `
+            <div class="task-image-container">
+                <img src="${task.imageUrl}" alt="Görev Görseli" loading="lazy">
+            </div>`;
+        }
+
+        if (task.completedImageUrl) {
+            imageHtml += `
+            <div class="task-image-container" style="border-color: var(--clr-status-completed)">
+                <div style="padding:4px 8px; font-size: 0.8rem; background: rgba(16, 185, 129, 0.2); color: #34d399;">Tamamlanan İşlem:</div>
+                <img src="${task.completedImageUrl}" alt="Tamamlanan İşlem Görseli" loading="lazy">
+            </div>`;
+        }
+
         const html = `
             <div class="task-card ${priorityClass} ${statusClass}">
                 <div class="task-header">
@@ -205,6 +301,7 @@ function renderSupervisorTasks() {
                         ${statusText}
                     </div>
                 </div>
+                ${imageHtml}
             </div>
         `;
         supervisorTasks.insertAdjacentHTML('beforeend', html);
@@ -235,6 +332,22 @@ function renderWorkerTasks() {
 
         const timeString = new Date(task.timestamp).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
 
+        let imageHtml = '';
+        if (task.imageUrl) {
+            imageHtml = `
+            <div class="task-image-container">
+                <img src="${task.imageUrl}" alt="Görev Görseli" loading="lazy">
+            </div>`;
+        }
+
+        if (task.completedImageUrl) {
+            imageHtml += `
+            <div class="task-image-container" style="border-color: var(--clr-status-completed)">
+                <div style="padding:4px 8px; font-size: 0.8rem; background: rgba(16, 185, 129, 0.2); color: #34d399;">Tarafınızdan Biten İşlem:</div>
+                <img src="${task.completedImageUrl}" alt="Tamamlanan İşlem Görseli" loading="lazy">
+            </div>`;
+        }
+
         let actionsHtml = '';
         if (task.status === 'pending') {
             actionsHtml = `
@@ -245,9 +358,18 @@ function renderWorkerTasks() {
                 </div>
             `;
         } else if (task.status === 'progress') {
+            // Include a mini form to upload an image when completing
             actionsHtml = `
+                <div class="file-upload-group" style="margin-top: 1rem;">
+                     <input type="file" id="complete-image-${task.id}" accept="image/*" class="file-input" onchange="previewCompleteImage(this, '${task.id}')">
+                     <label for="complete-image-${task.id}" class="file-label" style="font-size:0.8rem; padding: 0.5rem;">
+                         <span class="material-icons-round" style="font-size: 1.2rem;">add_a_photo</span>
+                         <span id="complete-file-name-${task.id}">Bitmiş Halinin Fotoğrafı (Ops)</span>
+                     </label>
+                     <img id="complete-preview-${task.id}" class="image-preview" style="display: none; max-height: 100px;" />
+                </div>
                 <div class="task-actions">
-                    <button class="action-btn complete" onclick="updateTaskStatus('${task.id}', 'completed')">
+                    <button class="action-btn complete" onclick="completeTaskWithImage('${task.id}')" id="btn-complete-${task.id}">
                         <span class="material-icons-round">done_all</span> Bitir
                     </button>
                 </div>
@@ -260,7 +382,8 @@ function renderWorkerTasks() {
                     <div class="task-title">${task.title}</div>
                     <div class="task-time">${timeString}</div>
                 </div>
-                <div class="task-meta">
+                ${imageHtml}
+                <div class="task-meta" style="margin-top: 0.5rem;">
                      <div class="meta-item" title="Atanan Usta">
                         <span class="material-icons-round">person</span>
                         ${task.worker}
@@ -275,6 +398,64 @@ function renderWorkerTasks() {
         `;
         workerTasks.insertAdjacentHTML('beforeend', html);
     });
+}
+
+function previewCompleteImage(inputElem, taskId) {
+    const file = inputElem.files[0];
+    const fileNameDisplay = document.getElementById(`complete-file-name-${taskId}`);
+    const imagePreview = document.getElementById(`complete-preview-${taskId}`);
+
+    if (file) {
+        fileNameDisplay.textContent = file.name;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            imagePreview.src = e.target.result;
+            imagePreview.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    } else {
+        fileNameDisplay.textContent = 'Bitmiş Halinin Fotoğrafı (Ops)';
+        imagePreview.style.display = 'none';
+        imagePreview.src = '';
+    }
+}
+
+async function completeTaskWithImage(taskId) {
+    const fileInput = document.getElementById(`complete-image-${taskId}`);
+    const btn = document.getElementById(`btn-complete-${taskId}`);
+    let completedImageUrl = null;
+
+    if (fileInput && fileInput.files[0]) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-icons-round">sync</span> İşleniyor...';
+        showToast('Fotoğraf işleniyor, lütfen bekleyin...', 'cloud_upload');
+
+        try {
+            const file = fileInput.files[0];
+            completedImageUrl = await compressImage(file);
+        } catch (error) {
+            console.error("Error compressing completion image:", error);
+            showToast('Resim işleme hatası!', 'error');
+            btn.disabled = false;
+            btn.innerHTML = '<span class="material-icons-round">done_all</span> Bitir';
+            return; // Stop completion if processing fails
+        }
+    }
+
+    try {
+        const taskRef = window.doc(window.db, "tasks", taskId);
+        const updateData = { status: 'completed' };
+        if (completedImageUrl) {
+            updateData.completedImageUrl = completedImageUrl;
+        }
+
+        await window.updateDoc(taskRef, updateData);
+        showToast('Görev tamamlandı!', 'done_all');
+    } catch (e) {
+        console.error("Error updating document: ", e);
+        showToast('Durum güncellenemedi!', 'error');
+        if (btn) btn.disabled = false;
+    }
 }
 
 function showToast(message, icon) {

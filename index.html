@@ -80,7 +80,15 @@
                         <label><input type="radio" name="priority" value="medium" checked> Normal</label>
                         <label><input type="radio" name="priority" value="high"> Acil</label>
                     </div>
-                    <button type="submit" class="btn secondary-btn">
+                    <div class="file-upload-group">
+                        <input type="file" id="task-image" accept="image/*" class="file-input">
+                        <label for="task-image" class="file-label">
+                            <span class="material-icons-round">add_a_photo</span>
+                            <span id="file-name-display">Fotoğraf Ekle (Opsiyonel)</span>
+                        </label>
+                        <img id="image-preview" class="image-preview" style="display: none;" />
+                    </div>
+                    <button type="submit" class="btn secondary-btn" id="submit-task-btn">
                         <span class="material-icons-round">add_task</span> Görevi Gönder
                     </button>
                 </form>
