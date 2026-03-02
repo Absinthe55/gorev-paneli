@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Titan Makina - Hidrolik Görev Sistemi</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="background">
+        <div class="shape shape-1"></div>
+        <div class="shape shape-2"></div>
+        <div class="shape shape-3"></div>
+    </div>
+
+    <!-- Giriş Ekranı -->
+    <main id="login-screen" class="screen active">
+        <div class="glass-card login-card">
+            <div class="logo-container">
+                <span class="material-icons-round logo-icon">precision_manufacturing</span>
+                <h1>TITAN MAKINA</h1>
+                <p>Hidrolik Birimi Görev Yönetimi</p>
+            </div>
+
+            <form id="login-form">
+                <div class="input-group">
+                    <span class="material-icons-round">person</span>
+                    <select id="username" required>
+                        <option value="" disabled selected>Giriş Yapılacak Kişi</option>
+                        <option value="Erkan Çilingir">Erkan Çilingir (Amir)</option>
+                        <option value="Berat Özker">Berat Özker (Usta)</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn primary-btn pulse-effect">
+                    Giriş Yap
+                    <span class="material-icons-round">arrow_forward</span>
+                </button>
+            </form>
+            <div class="hint">Sistemi test etmek için isminizi seçerek giriş yapın.</div>
+        </div>
+    </main>
+
+    <!-- Amir Paneli -->
+    <main id="supervisor-screen" class="screen">
+        <header class="glass-header">
+            <div class="header-info">
+                <h2>Amir Paneli</h2>
+                <p>Hoş geldin, <span class="current-user-name"></span></p>
+            </div>
+            <button class="icon-btn logout-btn" title="Çıkış Yap">
+                <span class="material-icons-round">logout</span>
+            </button>
+        </header>
+
+        <div class="content-area">
+            <section class="add-task-section glass-panel">
+                <h3>Yeni Görev Ver</h3>
+                <form id="add-task-form">
+                    <div class="input-group dark">
+                        <span class="material-icons-round">assignment</span>
+                        <input type="text" id="task-title" placeholder="Görev Başlığı / Tanımı" required>
+                    </div>
+                    <div class="input-group dark">
+                        <span class="material-icons-round">engineering</span>
+                        <select id="worker-select" required>
+                            <option value="" disabled selected>Usta Seçin</option>
+                            <option value="Berat Özker">Berat Özker</option>
+                        </select>
+                    </div>
+                    <div class="priority-selector">
+                        <span>Öncelik:</span>
+                        <label><input type="radio" name="priority" value="low"> Düşük</label>
+                        <label><input type="radio" name="priority" value="medium" checked> Normal</label>
+                        <label><input type="radio" name="priority" value="high"> Acil</label>
+                    </div>
+                    <button type="submit" class="btn secondary-btn">
+                        <span class="material-icons-round">add_task</span> Görevi Gönder
+                    </button>
+                </form>
+            </section>
+
+            <section class="task-list-section">
+                <div class="section-header">
+                    <h3>Sahadaki Görevler</h3>
+                    <div class="stats">
+                        <span class="badge pending" id="sup-pending-count">0 Bekliyor</span>
+                        <span class="badge in-progress" id="sup-progress-count">0 Devam Ediyor</span>
+                        <span class="badge completed" id="sup-completed-count">0 Biten</span>
+                    </div>
+                </div>
+                <div class="task-container" id="supervisor-tasks">
+                    <!-- Görevler buraya JavaScript ile eklenecek -->
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Usta Paneli -->
+    <main id="worker-screen" class="screen">
+        <header class="glass-header worker-header">
+            <div class="header-info">
+                <h2>Usta Paneli</h2>
+                <p>Kolay gelsin, <span class="current-user-name"></span></p>
+            </div>
+            <button class="icon-btn logout-btn" title="Çıkış Yap">
+                <span class="material-icons-round">logout</span>
+            </button>
+        </header>
+
+        <div class="content-area">
+            <section class="task-list-section">
+                <div class="section-header">
+                    <h3>Atanan Görevlerim</h3>
+                </div>
+                <div class="task-container" id="worker-tasks">
+                    <!-- Usta görevleri buraya eklenecek -->
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Toast Notification -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Firebase SDK Kurulumu (CDN üzerinden) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, updateDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCw5SWA0IphZg1DcvpwuybwGaPabs3ewfc",
+            authDomain: "titan-makina-gorev.firebaseapp.com",
+            projectId: "titan-makina-gorev",
+            storageBucket: "titan-makina-gorev.firebasestorage.app",
+            messagingSenderId: "862140750370",
+            appId: "1:862140750370:web:56dc5ec496b91e95ab887b",
+            measurementId: "G-V94D98HRK2"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Make db available to our app logic by putting it on window
+        window.db = db;
+        window.collection = collection;
+        window.addDoc = addDoc;
+        window.onSnapshot = onSnapshot;
+        window.query = query;
+        window.orderBy = orderBy;
+        window.updateDoc = updateDoc;
+        window.doc = doc;
+    </script>
+    <script src="app.js"></script>
+</body>
+
+</html>
