@@ -5,6 +5,9 @@ let leaves = [];
 let systemUsers = []; // Stores users fetched from DB
 let unsubscribe = null; // To hold the Firestore listener
 let leavesUnsubscribe = null;
+let selectedLoginUser = null;
+let selectedLoginRole = null;
+
 // DOM Elements
 const screens = {
     login: document.getElementById('login-screen'),
@@ -36,23 +39,25 @@ if (loginForm) {
             return;
         }
 
-        const passwordInput = document.getElementById('password').value;
+        const passwordInput = document.getElementById('password').value.trim();
         const loginBtn = document.getElementById('login-btn');
 
         if (passwordInput) {
             loginBtn.disabled = true;
             loginBtn.innerHTML = '<span class="material-icons-round">hourglass_empty</span> Doğrulanıyor...';
 
-            if (selectedLoginRole) {
-                // Find user in fetched systemUsers array securely
-                const user = systemUsers.find(u => u.name === selectedLoginUser);
+            // Find user in fetched systemUsers array securely
+            const user = systemUsers.find(u => u.name === selectedLoginUser);
 
-                if (user && user.password === passwordInput) {
+            if (user) {
+                if (user.password === passwordInput) {
                     login(user.name, user.role);
                     document.getElementById('password').value = ''; // Clear pwd
                 } else {
                     showToast('Hatalı şifre girdiniz.', 'error');
                 }
+            } else {
+                showToast('Kullanıcı bulunamadı.', 'error');
             }
 
             loginBtn.disabled = false;
@@ -120,19 +125,26 @@ async function init() {
     await fetchUsers();
 }
 
-let selectedLoginUser = null;
-let selectedLoginRole = null;
-
 async function fetchUsers() {
     try {
         const querySnapshot = await window.getDocs(window.collection(window.db, "users"));
         systemUsers = [];
+        const seenNames = new Set();
 
         const listContainer = document.getElementById('login-user-list');
         if (listContainer) listContainer.innerHTML = '';
 
         querySnapshot.forEach((doc) => {
             const userData = doc.data();
+
+            // Sadece benzersiz kullanıcıları ekle, kopyaları sil
+            if (seenNames.has(userData.name)) {
+                // Veritabanından kopyayı temizle
+                window.deleteDoc(window.doc(window.db, "users", doc.id)).catch(e => console.error("Kopya silinirken hata:", e));
+                return;
+            }
+
+            seenNames.add(userData.name);
             systemUsers.push({ id: doc.id, ...userData });
 
             if (listContainer) {
@@ -162,6 +174,7 @@ async function fetchUsers() {
             await window.addDoc(window.collection(window.db, "users"), defaultWorker);
             // Fetch again
             fetchUsers();
+            return;
         }
 
         // Add click events to new cards
@@ -183,7 +196,7 @@ async function fetchUsers() {
     } catch (e) {
         console.error("Error fetching users", e);
         if (document.getElementById('login-user-list')) {
-            document.getElementById('login-user-list').innerHTML = '<div style="color:var(--clr-status-urgent); text-align:center;">Bağlantı Hatası!</div>';
+            document.getElementById('login-user-list').innerHTML = '<div style="color:var(--clr-status-urgent); text-align:center;">Bağlantı Hatası! Lütfen sayfayı yenileyin.</div>';
         }
     }
 }
