@@ -702,6 +702,115 @@ body {
     object-fit: cover;
 }
 
+/* YouTube Audio Player Styles */
+.yt-audio-widget {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 300px;
+    background: rgba(20, 20, 20, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-md);
+    z-index: 1000;
+    overflow: hidden;
+    transition: var(--transition);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.yt-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.8rem 1rem;
+    background: rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+}
+
+.yt-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: var(--clr-primary);
+}
+
+.yt-body {
+    padding: 1rem;
+    display: none;
+    flex-direction: column;
+    gap: 0.8rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.yt-body.active {
+    display: flex;
+}
+
+#yt-url-input {
+    width: 100%;
+    padding: 0.6rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.1);
+    color: var(--clr-text-main);
+    font-size: 0.85rem;
+}
+
+.yt-controls {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.yt-btn {
+    flex: 1;
+    padding: 0.5rem;
+    font-size: 0.85rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.yt-btn.play {
+    background: rgba(16, 185, 129, 0.2);
+    color: #34d399;
+}
+
+.yt-btn.play:hover {
+    background: rgba(16, 185, 129, 0.3);
+}
+
+.yt-btn.stop {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+}
+
+.yt-btn.stop:hover {
+    background: rgba(239, 68, 68, 0.3);
+}
+
+.yt-volume-control {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--clr-text-muted);
+}
+
+#yt-volume {
+    flex: 1;
+    cursor: pointer;
+}
+
+.yt-status {
+    font-size: 0.8rem;
+    color: var(--clr-text-muted);
+    text-align: center;
+    font-style: italic;
+}
+
 /* Utilities */
 .status-text-pending {
     color: #cbd5e1;

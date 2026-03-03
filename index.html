@@ -134,10 +134,41 @@
         </div>
     </main>
 
+    <!-- YOUTUBE AUDIO PLAYER WIDGET -->
+    <div class="yt-audio-widget glass-panel" id="yt-audio-widget">
+        <div class="yt-header" onclick="toggleYtPlayer()">
+            <div class="yt-title">
+                <span class="material-icons-round">music_note</span>
+                <span>Müzik Çalar</span>
+            </div>
+            <span class="material-icons-round" id="yt-toggle-icon">expand_more</span>
+        </div>
+        <div class="yt-body" id="yt-body">
+            <input type="text" id="yt-url-input" placeholder="YouTube Linkini Yapıştırın...">
+            <div class="yt-controls">
+                <button class="btn yt-btn play" id="yt-play-btn" onclick="playYtAudio()">
+                    <span class="material-icons-round" id="yt-play-icon">play_arrow</span> Çal
+                </button>
+                <button class="btn yt-btn stop" id="yt-stop-btn" onclick="stopYtAudio()">
+                    <span class="material-icons-round">stop</span> Durdur
+                </button>
+            </div>
+            <div class="yt-volume-control">
+                <span class="material-icons-round">volume_down</span>
+                <input type="range" id="yt-volume" min="0" max="100" value="50" oninput="changeYtVolume(this.value)">
+                <span class="material-icons-round">volume_up</span>
+            </div>
+            <div id="yt-status-text" class="yt-status">Müzik bekleniyor...</div>
+            <!-- Hidden Player Container -->
+            <div id="yt-player-container" style="display:none; width:0; height:0;"></div>
+        </div>
+    </div>
+
     <!-- Toast Notification -->
     <div id="toast-container" class="toast-container"></div>
 
     <!-- Firebase SDK Kurulumu (CDN üzerinden) -->
+    <script src="https://www.youtube.com/iframe_api"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, updateDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";

@@ -3,6 +3,9 @@ let currentUser = null;
 let currentRole = null;
 let tasks = [];
 let unsubscribe = null; // To hold the Firestore listener
+let ytPlayer = null;
+let ytPlayerReady = false;
+let currentYtVideoId = null;
 
 // DOM Elements
 const screens = {
@@ -474,3 +477,123 @@ function showToast(message, icon) {
         setTimeout(() => toast.remove(), 300);
     }, 3000);
 }
+
+// ==========================================
+// YOUTUBE AUDIO PLAYER LOGIC
+// ==========================================
+
+// This function is automatically called by the YouTube IFrame API script when it loads
+window.onYouTubeIframeAPIReady = function () {
+    ytPlayer = new YT.Player('yt-player-container', {
+        height: '0',
+        width: '0',
+        videoId: '',
+        playerVars: {
+            'autoplay': 0,
+            'controls': 0,
+            'disablekb': 1,
+            'fs': 0,
+            'playsinline': 1
+        },
+        events: {
+            'onReady': onPlayerReady,
+            'onStateChange': onPlayerStateChange,
+            'onError': onPlayerError
+        }
+    });
+};
+
+function onPlayerReady(event) {
+    ytPlayerReady = true;
+    event.target.setVolume(50);
+}
+
+function onPlayerStateChange(event) {
+    const statusText = document.getElementById('yt-status-text');
+    const playIcon = document.getElementById('yt-play-icon');
+
+    if (event.data == YT.PlayerState.PLAYING) {
+        statusText.textContent = "Çalıyor...";
+        playIcon.textContent = "pause";
+    } else if (event.data == YT.PlayerState.PAUSED) {
+        statusText.textContent = "Duraklatıldı";
+        playIcon.textContent = "play_arrow";
+    } else if (event.data == YT.PlayerState.ENDED) {
+        statusText.textContent = "Müzik Bitti";
+        playIcon.textContent = "play_arrow";
+    } else if (event.data == YT.PlayerState.BUFFERING) {
+        statusText.textContent = "Yükleniyor...";
+    }
+}
+
+function onPlayerError(event) {
+    console.error("YouTube Player Error:", event.data);
+    showToast("Video yüklenemedi. Link hatalı veya video gizli olabilir.", "error");
+    document.getElementById('yt-status-text').textContent = "Hata oluştu";
+}
+
+function parseYouTubeId(url) {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+}
+
+window.toggleYtPlayer = function () {
+    const body = document.getElementById('yt-body');
+    const icon = document.getElementById('yt-toggle-icon');
+
+    if (body.classList.contains('active')) {
+        body.classList.remove('active');
+        icon.textContent = "expand_more";
+    } else {
+        body.classList.add('active');
+        icon.textContent = "expand_less";
+    }
+};
+
+window.playYtAudio = function () {
+    if (!ytPlayerReady) {
+        showToast("Player henüz yüklenmedi, bekleyin.", "warning");
+        return;
+    }
+
+    const urlInput = document.getElementById('yt-url-input').value.trim();
+    if (!urlInput) {
+        showToast("Lütfen bir YouTube linki girin!", "warning");
+        return;
+    }
+
+    const videoId = parseYouTubeId(urlInput);
+    if (!videoId) {
+        showToast("Geçerli bir YouTube linki bulunamadı.", "error");
+        return;
+    }
+
+    // If playing a new video
+    if (videoId !== currentYtVideoId) {
+        currentYtVideoId = videoId;
+        ytPlayer.loadVideoById(videoId);
+    } else {
+        // Toggle play/pause for current video
+        const state = ytPlayer.getPlayerState();
+        if (state === YT.PlayerState.PLAYING) {
+            ytPlayer.pauseVideo();
+        } else {
+            ytPlayer.playVideo();
+        }
+    }
+};
+
+window.stopYtAudio = function () {
+    if (ytPlayerReady && ytPlayer) {
+        ytPlayer.stopVideo();
+        document.getElementById('yt-status-text').textContent = "Durduruldu";
+        document.getElementById('yt-play-icon').textContent = "play_arrow";
+    }
+};
+
+window.changeYtVolume = function (val) {
+    if (ytPlayerReady && ytPlayer) {
+        ytPlayer.setVolume(val);
+    }
+};
