@@ -25,6 +25,24 @@ const screens = {
     worker: document.getElementById('worker-screen')
 };
 
+const matImageInput = document.getElementById('material-image');
+if (matImageInput) {
+    matImageInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        const nameEl = document.getElementById('mat-file-name-display');
+        const prevEl = document.getElementById('mat-image-preview');
+        if (file) {
+            if (nameEl) nameEl.textContent = file.name;
+            const r = new FileReader();
+            r.onload = ev => { if (prevEl) { prevEl.src = ev.target.result; prevEl.style.display = 'block'; } };
+            r.readAsDataURL(file);
+        } else {
+            if (nameEl) nameEl.textContent = 'Fotoğraf Ekle (Opsiyonel)';
+            if (prevEl) { prevEl.src = ''; prevEl.style.display = 'none'; }
+        }
+    });
+}
+
 const loginForm = document.getElementById('login-form');
 const addTaskForm = document.getElementById('add-task-form');
 const leaveForm = document.getElementById('leave-form');
@@ -126,17 +144,30 @@ if (materialForm) {
         if (!name) return;
         btn.disabled = true;
         btn.innerHTML = '<span class="material-icons-round spinning">sync</span> Gönderiliyor...';
+
+        let imageUrl = null;
+        const fileInput = document.getElementById('material-image');
+        if (fileInput && fileInput.files[0]) {
+            try { imageUrl = await compressImage(fileInput.files[0]); }
+            catch (e) { showToast('Resim işleme hatası!', 'error'); }
+        }
+
         try {
             await window.addDoc(window.collection(window.db, "materials"), {
                 worker: currentUser,
                 name,
                 desc,
+                imageUrl,
                 status: 'pending',
                 comments: [],
                 timestamp: new Date().toISOString()
             });
             showToast('Malzeme talebi gönderildi.', 'inventory_2');
             materialForm.reset();
+            const nameEl = document.getElementById('mat-file-name-display');
+            const prevEl = document.getElementById('mat-image-preview');
+            if (nameEl) nameEl.textContent = 'Fotoğraf Ekle (Opsiyonel)';
+            if (prevEl) { prevEl.src = ''; prevEl.style.display = 'none'; }
         } catch (e) {
             showToast('Talep gönderilemedi.', 'error');
         }
@@ -818,6 +849,7 @@ function renderSupervisorMaterials() {
         const commentsHtml = (m.comments || []).map(c =>
             `<div class="comment ${c.role}"><strong>${c.author}:</strong> ${c.text}</div>`
         ).join('');
+        const imageHtml = m.imageUrl ? `<div class="task-img-wrap" style="display:block;opacity:1"><img src="${m.imageUrl}" loading="lazy" onclick="openImageModal('${m.imageUrl}', event)"></div>` : '';
         list.insertAdjacentHTML('beforeend', `
             <div class="task-card" onclick="window.toggleTaskCard(this, event)">
                 <div class="task-header">
@@ -828,6 +860,7 @@ function renderSupervisorMaterials() {
                     <span class="chip chip-${st.cls}">${st.label}</span>
                 </div>
                 ${m.desc ? `<p class="mat-desc">${m.desc}</p>` : ''}
+                ${imageHtml}
                 <div class="comments-section">${commentsHtml}</div>
                 <div class="comment-form" onclick="event.stopPropagation()">
                     <input type="text" class="comment-input" id="mc-${m.id}" placeholder="Yorum ekle...">
@@ -862,6 +895,7 @@ function renderWorkerMaterials() {
         const commentsHtml = (m.comments || []).map(c =>
             `<div class="comment ${c.role}"><strong>${c.author}:</strong> ${c.text}</div>`
         ).join('');
+        const imageHtml = m.imageUrl ? `<div class="task-img-wrap" style="display:block;opacity:1"><img src="${m.imageUrl}" loading="lazy" onclick="openImageModal('${m.imageUrl}', event)"></div>` : '';
         list.insertAdjacentHTML('beforeend', `
             <div class="task-card" onclick="window.toggleTaskCard(this, event)">
                 <div class="task-header">
@@ -871,6 +905,7 @@ function renderWorkerMaterials() {
                     <span class="chip chip-${st.cls}">${st.label}</span>
                 </div>
                 ${m.desc ? `<p class="mat-desc">${m.desc}</p>` : ''}
+                ${imageHtml}
                 <div class="comments-section">${commentsHtml}</div>
                 <div class="comment-form" onclick="event.stopPropagation()">
                     <input type="text" class="comment-input" id="mc-${m.id}" placeholder="Yorum ekle...">
