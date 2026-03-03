@@ -1,8 +1,8 @@
-// State
 let currentUser = null;
 let currentRole = null;
 let tasks = [];
 let leaves = [];
+let systemUsers = []; // Stores users fetched from DB
 let unsubscribe = null; // To hold the Firestore listener
 let leavesUnsubscribe = null;
 // DOM Elements
@@ -12,6 +12,7 @@ const screens = {
     worker: document.getElementById('worker-screen')
 };
 
+const loginForm = document.getElementById('login-form');
 const addTaskForm = document.getElementById('add-task-form');
 const leaveForm = document.getElementById('leave-form');
 const supervisorTasks = document.getElementById('supervisor-tasks');
@@ -25,6 +26,33 @@ const submitTaskBtn = document.getElementById('submit-task-btn');
 
 // Event Listeners
 document.addEventListener('DOMContentLoaded', init);
+
+if (loginForm) {
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const usernameInput = document.getElementById('username').value;
+        const passwordInput = document.getElementById('password').value;
+        const loginBtn = document.getElementById('login-btn');
+
+        if (usernameInput && passwordInput) {
+            loginBtn.disabled = true;
+            loginBtn.innerHTML = '<span class="material-icons-round">hourglass_empty</span> Doğrulanıyor...';
+
+            // Find user in fetched systemUsers array
+            const user = systemUsers.find(u => u.name === usernameInput);
+
+            if (user && user.password === passwordInput) {
+                login(user.name, user.role);
+                document.getElementById('password').value = ''; // Clear pwd
+            } else {
+                showToast('Hatalı şifre girdiniz.', 'error');
+            }
+
+            loginBtn.disabled = false;
+            loginBtn.innerHTML = 'Giriş Yap <span class="material-icons-round">arrow_forward</span>';
+        }
+    });
+}
 
 addTaskForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -70,13 +98,54 @@ taskImageInput.addEventListener('change', (e) => {
 logoutBtns.forEach(btn => btn.addEventListener('click', logout));
 
 // Functions
-function init() {
+async function init() {
     // Check local storage for session
     const savedUser = localStorage.getItem('titan_user');
     const savedRole = localStorage.getItem('titan_role');
 
     if (savedUser && savedRole) {
         login(savedUser, savedRole, false);
+    }
+
+    // Always fetch users for login screen
+    await fetchUsers();
+}
+
+async function fetchUsers() {
+    try {
+        const querySnapshot = await window.getDocs(window.collection(window.db, "users"));
+        systemUsers = [];
+        const userSelect = document.getElementById('username');
+        if (userSelect) {
+            userSelect.innerHTML = '<option value="" disabled selected>Giriş Yapılacak Kişi</option>';
+        }
+
+        querySnapshot.forEach((doc) => {
+            const userData = doc.data();
+            systemUsers.push({ id: doc.id, ...userData });
+            if (userSelect) {
+                const opt = document.createElement('option');
+                opt.value = userData.name;
+                opt.textContent = `${userData.name} (${userData.role === 'supervisor' ? 'Amir' : 'Usta'})`;
+                userSelect.appendChild(opt);
+            }
+        });
+
+        // Add default users if none exist for first-time setup
+        if (systemUsers.length === 0) {
+            const defaultSup = { name: "Erkan Çilingir", role: "supervisor", password: "123" };
+            const defaultWorker = { name: "Berat Özker", role: "worker", password: "123" };
+            await window.addDoc(window.collection(window.db, "users"), defaultSup);
+            await window.addDoc(window.collection(window.db, "users"), defaultWorker);
+            // Fetch again
+            fetchUsers();
+        }
+
+    } catch (e) {
+        console.error("Error fetching users", e);
+        if (document.getElementById('username')) {
+            document.getElementById('username').innerHTML = '<option value="" disabled>Bağlantı Hatası!</option>';
+        }
     }
 }
 
@@ -126,6 +195,37 @@ function switchScreen(screenName) {
         screen.classList.remove('active');
     });
     screens[screenName].classList.add('active');
+
+    // Reset tabs to default (tasks) when switching screens
+    if (screenName === 'supervisor') {
+        window.switchTab('supervisor', 'tasks', document.querySelector('#supervisor-screen .nav-item'));
+    } else if (screenName === 'worker') {
+        window.switchTab('worker', 'tasks', document.querySelector('#worker-screen .nav-item'));
+    }
+}
+
+window.switchTab = function (role, tabName, navItemElement) {
+    // Hide all tabs for this role
+    const prefix = role === 'supervisor' ? 'sup' : 'wrk';
+    const allTabs = document.querySelectorAll(`#${role}-screen .tab-content`);
+    allTabs.forEach(tab => tab.classList.remove('active'));
+
+    // Remove active class from all nav items
+    const allNavs = document.querySelectorAll(`#${role}-screen .nav-item`);
+    allNavs.forEach(nav => nav.classList.remove('active'));
+
+    // Show target tab
+    document.getElementById(`${prefix}-tab-${tabName}`).classList.add('active');
+
+    // Highlight clicked nav item
+    if (navItemElement) {
+        navItemElement.classList.add('active');
+    }
+
+    // Refresh user list if profile tab is opened
+    if (tabName === 'profile') {
+        renderSystemUsers();
+    }
 }
 
 // Resizes and converts image to base64
@@ -755,5 +855,84 @@ function updateMediaSession(title, artist) {
         navigator.mediaSession.setActionHandler('play', function () { window.playRadio(); });
         navigator.mediaSession.setActionHandler('pause', function () { window.stopRadio(); });
         navigator.mediaSession.setActionHandler('stop', function () { window.stopRadio(); });
+    }
+}
+
+// USER MANAGEMENT (FAZ 3)
+function renderSystemUsers() {
+    const list = document.getElementById('user-management-list');
+    if (!list) return;
+    list.innerHTML = '';
+
+    // systemUsers array is updated via fetchUsers at init, but let's re-fetch to be sure
+    fetchUsers().then(() => {
+        systemUsers.forEach(u => {
+            const roleBadge = u.role === 'supervisor'
+                ? `<span class="badge in-progress"><span class="material-icons-round" style="font-size:12px">admin_panel_settings</span> Amir</span>`
+                : `<span class="badge pending"><span class="material-icons-round" style="font-size:12px">engineering</span> Usta</span>`;
+
+            const html = `
+                <div class="task-card" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; margin-bottom: 0.5rem; background: rgba(255,255,255,0.03);">
+                    <div>
+                        <div style="font-weight: 600; font-size: 1.1rem; color: var(--clr-text);">${u.name}</div>
+                        <div style="margin-top: 0.3rem; font-size: 0.85rem; color: var(--clr-text-muted);">Şifre: <span style="font-family: monospace; background: rgba(255,255,255,0.1); padding: 0.1rem 0.4rem; border-radius: 4px; color: white;">${u.password}</span></div>
+                    </div>
+                    <div>
+                        ${roleBadge}
+                    </div>
+                </div>
+            `;
+            list.insertAdjacentHTML('beforeend', html);
+        });
+    });
+}
+
+window.promptAddUser = async function () {
+    const name = prompt("Yeni personelin Adı Soyadı:");
+    if (!name || name.trim() === '') return;
+
+    const roleInput = prompt("Rolü nedir? (amir / usta):", "usta");
+    if (!roleInput) return;
+    const role = roleInput.toLowerCase().trim() === 'amir' ? 'supervisor' : 'worker';
+
+    const password = prompt("Giriş için bir şifre belirleyin:", "1234");
+    if (!password) return;
+
+    try {
+        await window.addDoc(window.collection(window.db, "users"), {
+            name: name.trim(),
+            role: role,
+            password: password
+        });
+        showToast('Yeni personel eklendi.', 'person_add');
+        renderSystemUsers();
+        fetchUsers(); // Refresh the global state
+    } catch (e) {
+        console.error("User add error", e);
+        showToast('Kullanıcı eklenemedi.', 'error');
+    }
+}
+
+window.promptDeleteUser = async function () {
+    const name = prompt("Silmek istediğiniz personelin tam adını yazın:\\n(UYARI: Bu işlem geri alınamaz)");
+    if (!name || name.trim() === '') return;
+
+    // Find the user ID
+    const userToDelete = systemUsers.find(u => u.name.toLowerCase() === name.trim().toLowerCase());
+
+    if (userToDelete) {
+        if (confirm(`${userToDelete.name} sistemden tamamen silinecek. Onaylıyor musunuz?`)) {
+            try {
+                await window.deleteDoc(window.doc(window.db, "users", userToDelete.id));
+                showToast('Personel sistemden silindi.', 'person_remove');
+                renderSystemUsers();
+                fetchUsers(); // Refresh global state
+            } catch (e) {
+                console.error("User delete error", e);
+                showToast('Silinirken hata oluştu.', 'error');
+            }
+        }
+    } else {
+        showToast('Bu isimde bir personel bulunamadı.', 'error');
     }
 }

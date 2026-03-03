@@ -19,6 +19,14 @@
         <div class="shape shape-3"></div>
     </div>
 
+    <!-- Sürüm Etiketi -->
+    <div class="version-tag">
+        <span class="material-icons-round">update</span> Sürüm: 03.03.2026 - 09:30
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="toast-container"></div>
+
     <!-- Giriş Ekranı -->
     <main id="login-screen" class="screen active">
         <div class="glass-card login-card">
@@ -28,32 +36,25 @@
                 <p>Hidrolik Birimi Görev Yönetimi</p>
             </div>
 
-            <div class="login-options">
-                <!-- Amir Card -->
-                <div class="login-card-user" onclick="window.login('Erkan Çilingir', 'supervisor')">
-                    <div class="user-avatar amir">
-                        <span class="material-icons-round">admin_panel_settings</span>
-                    </div>
-                    <div class="user-info">
-                        <h3>Erkan Çilingir</h3>
-                        <p>Amir (Yönetici)</p>
-                    </div>
-                    <span class="material-icons-round arrow">chevron_right</span>
+            <form id="login-form">
+                <div class="input-group">
+                    <span class="material-icons-round">person</span>
+                    <select id="username" required>
+                        <option value="" disabled selected>Kullanıcı Yükleniyor...</option>
+                    </select>
                 </div>
 
-                <!-- Worker Card -->
-                <div class="login-card-user" onclick="window.login('Berat Özker', 'worker')">
-                    <div class="user-avatar usta">
-                        <span class="material-icons-round">engineering</span>
-                    </div>
-                    <div class="user-info">
-                        <h3>Berat Özker</h3>
-                        <p>Hidrolik Ustası</p>
-                    </div>
-                    <span class="material-icons-round arrow">chevron_right</span>
+                <div class="input-group">
+                    <span class="material-icons-round">lock</span>
+                    <input type="password" id="password" autocomplete="current-password" placeholder="Şifre" required>
                 </div>
-            </div>
-            <div class="hint">Sisteme giriş yapmak için profilinizi seçin.</div>
+
+                <button type="submit" class="btn primary-btn pulse-effect" id="login-btn">
+                    Giriş Yap
+                    <span class="material-icons-round">arrow_forward</span>
+                </button>
+            </form>
+            <div class="hint">Devam etmek için hesabınızı seçin ve şifrenizi girin.</div>
         </div>
     </main>
 
@@ -70,62 +71,106 @@
         </header>
 
         <div class="content-area">
-            <section class="add-task-section glass-panel">
-                <h3>Yeni Görev Ver</h3>
-                <form id="add-task-form">
-                    <div class="input-group dark">
-                        <span class="material-icons-round">assignment</span>
-                        <input type="text" id="task-title" placeholder="Görev Başlığı / Tanımı" required>
+            <!-- GÖREVLER SEKMESİ -->
+            <div id="sup-tab-tasks" class="tab-content active">
+                <section class="add-task-section glass-panel">
+                    <h3>Yeni Görev Ver</h3>
+                    <form id="add-task-form">
+                        <div class="input-group dark">
+                            <span class="material-icons-round">assignment</span>
+                            <input type="text" id="task-title" placeholder="Görev Başlığı / Tanımı" required>
+                        </div>
+                        <div class="input-group dark">
+                            <span class="material-icons-round">engineering</span>
+                            <select id="worker-select" required>
+                                <option value="" disabled selected>Usta Seçin</option>
+                                <!-- JavaScript ile doldurulacak -->
+                            </select>
+                        </div>
+                        <div class="priority-selector">
+                            <span>Öncelik:</span>
+                            <label><input type="radio" name="priority" value="low"> Düşük</label>
+                            <label><input type="radio" name="priority" value="medium" checked> Normal</label>
+                            <label><input type="radio" name="priority" value="high"> Acil</label>
+                        </div>
+                        <div class="file-upload-group">
+                            <input type="file" id="task-image" accept="image/*" class="file-input">
+                            <label for="task-image" class="file-label">
+                                <span class="material-icons-round">add_a_photo</span>
+                                <span id="file-name-display">Fotoğraf Ekle (Opsiyonel)</span>
+                            </label>
+                            <img id="image-preview" class="image-preview" style="display: none;" />
+                        </div>
+                        <button type="submit" class="btn secondary-btn" id="submit-task-btn">
+                            <span class="material-icons-round">add_task</span> Görevi Gönder
+                        </button>
+                    </form>
+                </section>
+
+                <section class="task-list-section">
+                    <div class="section-header">
+                        <h3>Sahadaki Görevler</h3>
+                        <div class="stats">
+                            <span class="badge pending" id="sup-pending-count">0 Bekliyor</span>
+                            <span class="badge in-progress" id="sup-progress-count">0 Devam Ediyor</span>
+                            <span class="badge completed" id="sup-completed-count">0 Biten</span>
+                        </div>
                     </div>
-                    <div class="input-group dark">
-                        <span class="material-icons-round">engineering</span>
-                        <select id="worker-select" required>
-                            <option value="" disabled selected>Usta Seçin</option>
-                            <option value="Berat Özker">Berat Özker</option>
-                        </select>
+                    <div class="task-container" id="supervisor-tasks">
+                        <!-- Görevler buraya JavaScript ile eklenecek -->
                     </div>
-                    <div class="priority-selector">
-                        <span>Öncelik:</span>
-                        <label><input type="radio" name="priority" value="low"> Düşük</label>
-                        <label><input type="radio" name="priority" value="medium" checked> Normal</label>
-                        <label><input type="radio" name="priority" value="high"> Acil</label>
+                </section>
+            </div>
+
+            <!-- TAKVİM & İZİNLER SEKMESİ -->
+            <div id="sup-tab-calendar" class="tab-content">
+                <section class="leave-list-section glass-panel">
+                    <h3><span class="material-icons-round" style="vertical-align: middle;">event_note</span> İzin
+                        Talepleri & Takvim</h3>
+                    <div class="task-container" id="supervisor-leaves">
+                        <!-- İzinler buraya eklenecek -->
                     </div>
-                    <div class="file-upload-group">
-                        <input type="file" id="task-image" accept="image/*" class="file-input">
-                        <label for="task-image" class="file-label">
-                            <span class="material-icons-round">add_a_photo</span>
-                            <span id="file-name-display">Fotoğraf Ekle (Opsiyonel)</span>
-                        </label>
-                        <img id="image-preview" class="image-preview" style="display: none;" />
+                </section>
+            </div>
+
+            <!-- PROFİL / EKİP YÖNETİMİ SEKMESİ -->
+            <div id="sup-tab-profile" class="tab-content">
+                <section class="user-management-section glass-panel">
+                    <h3><span class="material-icons-round" style="vertical-align: middle;">manage_accounts</span> Ekip
+                        Yönetimi</h3>
+                    <p style="font-size: 0.85rem; color: var(--clr-text-muted); margin-bottom: 1rem;">Sisteme giriş
+                        yapabilen personelleri ve şifrelerini buradan yönetebilirsiniz. Silinen kullanıcılar sisteme
+                        giremez.</p>
+
+                    <div class="task-container" id="user-management-list" style="margin-bottom: 1rem;">
+                        <!-- Kullanıcılar listelenecek -->
                     </div>
-                    <button type="submit" class="btn secondary-btn" id="submit-task-btn">
-                        <span class="material-icons-round">add_task</span> Görevi Gönder
+
+                    <button class="btn secondary-btn" onclick="window.promptAddUser()">
+                        <span class="material-icons-round">person_add</span> Yeni Kullanıcı Ekle
                     </button>
-                </form>
-            </section>
-
-            <section class="task-list-section">
-                <div class="section-header">
-                    <h3>Sahadaki Görevler</h3>
-                    <div class="stats">
-                        <span class="badge pending" id="sup-pending-count">0 Bekliyor</span>
-                        <span class="badge in-progress" id="sup-progress-count">0 Devam Ediyor</span>
-                        <span class="badge completed" id="sup-completed-count">0 Biten</span>
-                    </div>
-                </div>
-                <div class="task-container" id="supervisor-tasks">
-                    <!-- Görevler buraya JavaScript ile eklenecek -->
-                </div>
-            </section>
-
-            <section class="leave-list-section glass-panel" style="margin-top: 1rem;">
-                <h3><span class="material-icons-round" style="vertical-align: middle;">event_note</span> İzin Talepleri
-                    & Takvim</h3>
-                <div class="task-container" id="supervisor-leaves">
-                    <!-- İzinler buraya eklenecek -->
-                </div>
-            </section>
+                    <button class="btn yt-btn stop" onclick="window.promptDeleteUser()"
+                        style="margin-top: 0.5rem; width: 100%;">
+                        <span class="material-icons-round">person_remove</span> Kullanıcı Sil
+                    </button>
+                </section>
+            </div>
         </div>
+
+        <nav class="bottom-nav">
+            <a class="nav-item active" onclick="window.switchTab('supervisor', 'tasks', this)">
+                <span class="material-icons-round">assignment</span>
+                <span>Görevler</span>
+            </a>
+            <a class="nav-item" onclick="window.switchTab('supervisor', 'calendar', this)">
+                <span class="material-icons-round">event</span>
+                <span>Takvim</span>
+            </a>
+            <a class="nav-item" onclick="window.switchTab('supervisor', 'profile', this)">
+                <span class="material-icons-round">people</span>
+                <span>Kullanıcılar</span>
+            </a>
+        </nav>
     </main>
 
     <!-- Usta Paneli -->
@@ -141,41 +186,59 @@
         </header>
 
         <div class="content-area">
-            <section class="task-list-section">
-                <div class="section-header">
-                    <h3>Atanan Görevlerim</h3>
-                </div>
-                <div class="task-container" id="worker-tasks">
-                    <!-- Usta görevleri buraya eklenecek -->
-                </div>
-            </section>
-
-            <section class="leave-request-section glass-panel">
-                <h3><span class="material-icons-round" style="vertical-align: middle;">flight_takeoff</span> Yıllık İzin
-                    Talep Et</h3>
-                <form id="leave-form">
-                    <div class="input-group dark" style="margin-bottom: 0.5rem;">
-                        <span class="material-icons-round">calendar_today</span>
-                        <input type="date" id="leave-start" required title="Başlangıç Tarihi">
+            <!-- GÖREVLER SEKMESİ -->
+            <div id="wrk-tab-tasks" class="tab-content active">
+                <section class="task-list-section">
+                    <div class="section-header">
+                        <h3>Atanan Görevlerim</h3>
                     </div>
-                    <div
-                        style="color: var(--clr-text-muted); font-size: 0.8rem; margin-bottom: 0.5rem; padding-left: 1rem;">
-                        Başlangıç Tarihi</div>
-
-                    <div class="input-group dark" style="margin-bottom: 0.5rem;">
-                        <span class="material-icons-round">event_busy</span>
-                        <input type="date" id="leave-end" required title="Bitiş Tarihi">
+                    <div class="task-container" id="worker-tasks">
+                        <!-- Usta görevleri buraya eklenecek -->
                     </div>
-                    <div
-                        style="color: var(--clr-text-muted); font-size: 0.8rem; margin-bottom: 1rem; padding-left: 1rem;">
-                        Bitiş Tarihi</div>
+                </section>
+            </div>
 
-                    <button type="submit" class="btn secondary-btn" id="submit-leave-btn">
-                        <span class="material-icons-round">send</span> İzin Talebi Gönder
-                    </button>
-                </form>
-            </section>
+            <!-- TAKVİM & İZİNLER SEKMESİ -->
+            <div id="wrk-tab-calendar" class="tab-content">
+                <section class="leave-request-section glass-panel">
+                    <h3><span class="material-icons-round" style="vertical-align: middle;">flight_takeoff</span> Yıllık
+                        İzin
+                        Talep Et</h3>
+                    <form id="leave-form">
+                        <div class="input-group dark" style="margin-bottom: 0.5rem;">
+                            <span class="material-icons-round">calendar_today</span>
+                            <input type="date" id="leave-start" required title="Başlangıç Tarihi">
+                        </div>
+                        <div
+                            style="color: var(--clr-text-muted); font-size: 0.8rem; margin-bottom: 0.5rem; padding-left: 1rem;">
+                            Başlangıç Tarihi</div>
+
+                        <div class="input-group dark" style="margin-bottom: 0.5rem;">
+                            <span class="material-icons-round">event_busy</span>
+                            <input type="date" id="leave-end" required title="Bitiş Tarihi">
+                        </div>
+                        <div
+                            style="color: var(--clr-text-muted); font-size: 0.8rem; margin-bottom: 1rem; padding-left: 1rem;">
+                            Bitiş Tarihi</div>
+
+                        <button type="submit" class="btn secondary-btn" id="submit-leave-btn">
+                            <span class="material-icons-round">send</span> İzin Talebi Gönder
+                        </button>
+                    </form>
+                </section>
+            </div>
         </div>
+
+        <nav class="bottom-nav">
+            <a class="nav-item active" onclick="window.switchTab('worker', 'tasks', this)">
+                <span class="material-icons-round">format_list_bulleted</span>
+                <span>Görevlerim</span>
+            </a>
+            <a class="nav-item" onclick="window.switchTab('worker', 'calendar', this)">
+                <span class="material-icons-round">date_range</span>
+                <span>İzin Al</span>
+            </a>
+        </nav>
     </main>
 
     <!-- RADIO PLAYER WIDGET -->

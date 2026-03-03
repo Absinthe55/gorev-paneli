@@ -107,18 +107,53 @@ body {
     }
 }
 
+/* Version Tag */
+.version-tag {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    font-size: 0.75rem;
+    color: var(--clr-text-muted);
+    background: rgba(0, 0, 0, 0.3);
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    z-index: 50;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+.version-tag .material-icons-round {
+    font-size: 0.9rem;
+    color: var(--clr-primary);
+}
+
 /* Layout & Screens */
 .screen {
     display: none;
     min-height: 100vh;
     flex-direction: column;
     padding: 1rem;
-    padding-bottom: 5rem;
+    padding-bottom: 80px;
+    /* Space for bottom nav */
     animation: fadeIn 0.4s ease-out forwards;
 }
 
 .screen.active {
     display: flex;
+}
+
+/* Tabs */
+.tab-content {
+    display: none;
+    animation: fadeIn 0.3s ease-out forwards;
+}
+
+.tab-content.active {
+    display: block;
 }
 
 @keyframes fadeIn {
@@ -341,6 +376,53 @@ body {
     font-size: 0.8rem;
     color: var(--clr-text-muted);
     opacity: 0.7;
+}
+
+/* Bottom Navigation (Faz 3) */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: rgba(26, 26, 36, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    z-index: 100;
+    padding-bottom: env(safe-area-inset-bottom);
+    /* For iPhone notch */
+}
+
+.nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-decoration: none;
+    color: var(--clr-text-muted);
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 0.5rem;
+    border-radius: 12px;
+    transition: all 0.2s ease;
+    gap: 4px;
+    min-width: 65px;
+}
+
+.nav-item .material-icons-round {
+    font-size: 1.5rem;
+    transition: all 0.2s ease;
+}
+
+.nav-item.active {
+    color: var(--clr-primary);
+}
+
+.nav-item.active .material-icons-round {
+    transform: translateY(-2px);
 }
 
 /* User Login Cards */
