@@ -686,6 +686,12 @@ input[type="date"] {
     font-weight: 500;
 }
 
+.leave-badge.pending {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fcd34d;
+    border-color: rgba(245, 158, 11, 0.3);
+}
+
 .primary-btn {
     background: linear-gradient(135deg, var(--clr-primary), #2563eb);
     color: white;

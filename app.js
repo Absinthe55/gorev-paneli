@@ -754,7 +754,7 @@ window.changeCalendarMonth = function (offset) {
 };
 
 function renderLeaveCalendar() {
-    const approved = leaves.filter(l => l.status === 'approved');
+    const validLeaves = leaves.filter(l => l.status === 'approved' || l.status === 'pending');
     const containers = [
         { grid: 'leave-calendar-view', header: 'sup-calendar-month-year' },
         { grid: 'wrk-leave-calendar-view', header: 'wrk-calendar-month-year' }
@@ -798,7 +798,7 @@ function renderLeaveCalendar() {
             const currentDateStr = new Date(year, month, i).toLocaleDateString('en-CA'); // YYYY-MM-DD format, yerel farksız
 
             // Bu günde izinli olanları bul
-            const leavesToday = approved.filter(l => {
+            const leavesToday = validLeaves.filter(l => {
                 const start = new Date(l.start).setHours(0, 0, 0, 0);
                 const end = new Date(l.end).setHours(23, 59, 59, 999);
                 const current = new Date(year, month, i).setHours(12, 0, 0, 0);
@@ -807,7 +807,7 @@ function renderLeaveCalendar() {
 
             // İzin rozetlerini oluştur
             const badgesHtml = leavesToday.map(l =>
-                `<div class="leave-badge" title="${l.worker}">${l.worker.split(' ')[0]}</div>`
+                `<div class="leave-badge ${l.status === 'pending' ? 'pending' : ''}" title="${l.worker}">${l.worker.split(' ')[0]}</div>`
             ).join('');
 
             gridEl.insertAdjacentHTML('beforeend', `
