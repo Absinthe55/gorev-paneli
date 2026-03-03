@@ -1,14 +1,22 @@
+// ============================================================
+//  TITAN MAKİNA - GÖREV YÖNETİM SİSTEMİ  |  app.js
+// ============================================================
+
 let currentUser = null;
 let currentRole = null;
 let tasks = [];
 let leaves = [];
-let systemUsers = []; // Stores users fetched from DB
-let unsubscribe = null; // To hold the Firestore listener
+let materials = [];
+let systemUsers = [];
+let unsubscribe = null;
 let leavesUnsubscribe = null;
+let materialsUnsubscribe = null;
 let selectedLoginUser = null;
 let selectedLoginRole = null;
+let currentTaskFilter = 'all';
+let currentWorkerTaskFilter = 'all';
 
-// DOM Elements
+// DOM refs
 const screens = {
     login: document.getElementById('login-screen'),
     supervisor: document.getElementById('supervisor-screen'),
@@ -18,6 +26,7 @@ const screens = {
 const loginForm = document.getElementById('login-form');
 const addTaskForm = document.getElementById('add-task-form');
 const leaveForm = document.getElementById('leave-form');
+const materialForm = document.getElementById('material-form');
 const supervisorTasks = document.getElementById('supervisor-tasks');
 const workerTasks = document.getElementById('worker-tasks');
 const logoutBtns = document.querySelectorAll('.logout-btn');
@@ -27,101 +36,171 @@ const fileNameDisplay = document.getElementById('file-name-display');
 const imagePreview = document.getElementById('image-preview');
 const submitTaskBtn = document.getElementById('submit-task-btn');
 
-// Event Listeners
 document.addEventListener('DOMContentLoaded', init);
+
+// ─── LOGIN ──────────────────────────────────────────────────
 
 if (loginForm) {
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-
-        if (!selectedLoginUser) {
-            showToast('Lütfen listeden bir kişi seçin.', 'error');
-            return;
-        }
-
+        if (!selectedLoginUser) { showToast('Lütfen listeden bir kişi seçin.', 'person'); return; }
         const passwordInput = document.getElementById('password').value.trim();
         const loginBtn = document.getElementById('login-btn');
+        if (!passwordInput) { showToast('Lütfen şifrenizi girin.', 'lock'); return; }
 
-        if (passwordInput) {
-            loginBtn.disabled = true;
-            loginBtn.innerHTML = '<span class="material-icons-round">hourglass_empty</span> Doğrulanıyor...';
+        loginBtn.disabled = true;
+        loginBtn.innerHTML = '<span class="material-icons-round spinning">sync</span> Doğrulanıyor...';
 
-            // Find user in fetched systemUsers array securely
-            const user = systemUsers.find(u => u.name === selectedLoginUser);
-
-            if (user) {
-                if (user.password === passwordInput) {
-                    login(user.name, user.role);
-                    document.getElementById('password').value = ''; // Clear pwd
-                } else {
-                    showToast('Hatalı şifre girdiniz.', 'error');
-                }
-            } else {
-                showToast('Kullanıcı bulunamadı.', 'error');
-            }
-
-            loginBtn.disabled = false;
-            loginBtn.innerHTML = 'Giriş Yap <span class="material-icons-round">arrow_forward</span>';
+        const user = systemUsers.find(u => u.name === selectedLoginUser);
+        if (user && user.password === passwordInput) {
+            login(user.name, user.role);
+            document.getElementById('password').value = '';
         } else {
-            showToast('Lütfen şifrenizi girin.', 'warning');
+            showToast('Hatalı şifre girdiniz.', 'lock');
+        }
+        loginBtn.disabled = false;
+        loginBtn.innerHTML = 'Giriş Yap <span class="material-icons-round">arrow_forward</span>';
+    });
+}
+
+// ─── ADD TASK ───────────────────────────────────────────────
+
+if (addTaskForm) {
+    addTaskForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const title = document.getElementById('task-title').value.trim();
+        const worker = document.getElementById('worker-select').value;
+        const priority = document.querySelector('input[name="priority"]:checked').value;
+        const file = taskImageInput ? taskImageInput.files[0] : null;
+        if (title && worker) {
+            submitTaskBtn.disabled = true;
+            submitTaskBtn.innerHTML = '<span class="material-icons-round spinning">sync</span> Yükleniyor...';
+            await addTask(title, worker, priority, file);
+            addTaskForm.reset();
+            if (imagePreview) { imagePreview.style.display = 'none'; imagePreview.src = ''; }
+            if (fileNameDisplay) fileNameDisplay.textContent = 'Fotoğraf Ekle (Opsiyonel)';
+            submitTaskBtn.disabled = false;
+            submitTaskBtn.innerHTML = '<span class="material-icons-round">send</span> Görevi Ata';
         }
     });
 }
 
-addTaskForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const title = document.getElementById('task-title').value.trim();
-    const worker = document.getElementById('worker-select').value;
-    const priority = document.querySelector('input[name="priority"]:checked').value;
-    const file = taskImageInput.files[0];
+// ─── LEAVE FORM ─────────────────────────────────────────────
 
-    if (title && worker) {
-        // Disable button during upload
-        submitTaskBtn.disabled = true;
-        submitTaskBtn.innerHTML = '<span class="material-icons-round">hourglass_empty</span> Yükleniyor...';
+if (leaveForm) {
+    leaveForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('submit-leave-btn');
+        const start = document.getElementById('leave-start').value;
+        const end = document.getElementById('leave-end').value;
+        if (!start || !end) return;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-icons-round spinning">sync</span> Gönderiliyor...';
+        try {
+            await window.addDoc(window.collection(window.db, "leaves"), {
+                worker: currentUser, start, end, status: 'pending',
+                timestamp: new Date().toISOString()
+            });
+            showToast('İzin talebi gönderildi.', 'event_available');
+            leaveForm.reset();
+            renderLeaveCalendar();
+        } catch (e) {
+            showToast('İzin talebi gönderilemedi.', 'error');
+        }
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-icons-round">send</span> İzin Talebi Gönder';
+    });
+}
 
-        await addTask(title, worker, priority, file);
+// ─── MATERIAL FORM ──────────────────────────────────────────
 
-        addTaskForm.reset();
-        imagePreview.style.display = 'none';
-        imagePreview.src = '';
-        fileNameDisplay.textContent = 'Fotoğraf Ekle (Opsiyonel)';
+if (materialForm) {
+    materialForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('submit-material-btn');
+        const name = document.getElementById('material-name').value.trim();
+        const desc = document.getElementById('material-desc').value.trim();
+        if (!name) return;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-icons-round spinning">sync</span> Gönderiliyor...';
+        try {
+            await window.addDoc(window.collection(window.db, "materials"), {
+                worker: currentUser,
+                name,
+                desc,
+                status: 'pending',
+                comments: [],
+                timestamp: new Date().toISOString()
+            });
+            showToast('Malzeme talebi gönderildi.', 'inventory_2');
+            materialForm.reset();
+        } catch (e) {
+            showToast('Talep gönderilemedi.', 'error');
+        }
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-icons-round">send</span> Talep Gönder';
+    });
+}
 
-        submitTaskBtn.disabled = false;
-        submitTaskBtn.innerHTML = '<span class="material-icons-round">add_task</span> Görevi Gönder';
-    }
+// ─── LOGOUT ─────────────────────────────────────────────────
+
+logoutBtns.forEach(btn => {
+    btn.addEventListener('click', logout);
 });
 
-taskImageInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) {
-        fileNameDisplay.textContent = file.name;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            imagePreview.src = e.target.result;
-            imagePreview.style.display = 'block';
-        };
-        reader.readAsDataURL(file);
-    } else {
-        fileNameDisplay.textContent = 'Fotoğraf Ekle (Opsiyonel)';
-        imagePreview.style.display = 'none';
-        imagePreview.src = '';
-    }
-});
+// ─── IMAGE PREVIEW ──────────────────────────────────────────
 
-logoutBtns.forEach(btn => btn.addEventListener('click', logout));
+if (taskImageInput) {
+    taskImageInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            if (fileNameDisplay) fileNameDisplay.textContent = file.name;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                imagePreview.src = ev.target.result;
+                imagePreview.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+}
 
-// Functions
+// ─── PULL TO REFRESH ────────────────────────────────────────
+
+(function initPullToRefresh() {
+    let startY = 0;
+    const spinner = document.getElementById('ptr-spinner');
+    const threshold = 80;
+
+    document.addEventListener('touchstart', (e) => {
+        startY = e.touches[0].clientY;
+    }, { passive: true });
+
+    document.addEventListener('touchend', (e) => {
+        const endY = e.changedTouches[0].clientY;
+        const diff = endY - startY;
+        // Only trigger if scrolled to very top of the active content area
+        const contentArea = document.querySelector('.screen.active .content-area');
+        const atTop = !contentArea || contentArea.scrollTop < 5;
+        if (diff > threshold && atTop) {
+            if (spinner) {
+                spinner.classList.add('visible');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 700);
+            }
+        }
+    }, { passive: true });
+})();
+
+// ─── INIT ───────────────────────────────────────────────────
+
 async function init() {
-    // Check local storage for session
     const savedUser = localStorage.getItem('titan_user');
     const savedRole = localStorage.getItem('titan_role');
-
     if (savedUser && savedRole) {
         login(savedUser, savedRole, false);
     }
-
-    // Always fetch users for login screen
     await fetchUsers();
 }
 
@@ -134,121 +213,92 @@ async function fetchUsers() {
         const listContainer = document.getElementById('login-user-list');
         if (listContainer) listContainer.innerHTML = '';
 
+        const workerSelect = document.getElementById('worker-select');
+        if (workerSelect) workerSelect.innerHTML = '<option value="" disabled selected>Usta Seçin</option>';
+
         querySnapshot.forEach((doc) => {
             const userData = doc.data();
-
-            // Sadece benzersiz kullanıcıları ekle, kopyaları sil
             if (seenNames.has(userData.name)) {
-                // Veritabanından kopyayı temizle
-                window.deleteDoc(window.doc(window.db, "users", doc.id)).catch(e => console.error("Kopya silinirken hata:", e));
+                window.deleteDoc(window.doc(window.db, "users", doc.id)).catch(() => { });
                 return;
             }
-
             seenNames.add(userData.name);
             systemUsers.push({ id: doc.id, ...userData });
 
+            // Login cards
             if (listContainer) {
                 const roleIcon = userData.role === 'supervisor' ? 'admin_panel_settings' : 'engineering';
                 const roleText = userData.role === 'supervisor' ? 'Amir' : 'Usta';
-
-                const cardHtml = `
+                listContainer.insertAdjacentHTML('beforeend', `
                     <div class="login-card-user" data-uid="${doc.id}" data-name="${userData.name}" data-role="${userData.role}">
-                        <div class="icon-box">
-                            <span class="material-icons-round">${roleIcon}</span>
-                        </div>
+                        <div class="icon-box"><span class="material-icons-round">${roleIcon}</span></div>
                         <div class="user-info">
                             <span class="name">${userData.name}</span>
                             <span class="role">${roleText}</span>
                         </div>
                     </div>
-                `;
-                listContainer.insertAdjacentHTML('beforeend', cardHtml);
+                `);
+            }
+
+            // Worker dropdown (only workers)
+            if (workerSelect && userData.role === 'worker') {
+                const opt = document.createElement('option');
+                opt.value = userData.name;
+                opt.textContent = userData.name;
+                workerSelect.appendChild(opt);
             }
         });
 
-        // Add default users if none exist for first-time setup
         if (systemUsers.length === 0) {
-            const defaultSup = { name: "Erkan Çilingir", role: "supervisor", password: "123" };
-            const defaultWorker = { name: "Berat Özker", role: "worker", password: "123" };
-            await window.addDoc(window.collection(window.db, "users"), defaultSup);
-            await window.addDoc(window.collection(window.db, "users"), defaultWorker);
-            // Fetch again
-            fetchUsers();
-            return;
+            await window.addDoc(window.collection(window.db, "users"), { name: "Erkan Çilingir", role: "supervisor", password: "123" });
+            await window.addDoc(window.collection(window.db, "users"), { name: "Berat Özker", role: "worker", password: "123" });
+            return fetchUsers();
         }
 
-        // Add click events to new cards
         if (listContainer) {
-            const cards = listContainer.querySelectorAll('.login-card-user');
-            cards.forEach(card => {
+            listContainer.querySelectorAll('.login-card-user').forEach(card => {
                 card.addEventListener('click', () => {
-                    // Remove active from all
-                    cards.forEach(c => c.classList.remove('active'));
-                    // Add active to clicked
+                    listContainer.querySelectorAll('.login-card-user').forEach(c => c.classList.remove('active'));
                     card.classList.add('active');
-
                     selectedLoginUser = card.getAttribute('data-name');
                     selectedLoginRole = card.getAttribute('data-role');
                 });
             });
         }
-
     } catch (e) {
-        console.error("Error fetching users", e);
-        if (document.getElementById('login-user-list')) {
-            document.getElementById('login-user-list').innerHTML = '<div style="color:var(--clr-status-urgent); text-align:center;">Bağlantı Hatası! Lütfen sayfayı yenileyin.</div>';
-        }
+        console.error("fetchUsers error:", e);
+        const listContainer = document.getElementById('login-user-list');
+        if (listContainer) listContainer.innerHTML = '<div style="color:red;text-align:center">Bağlantı Hatası!</div>';
     }
 }
 
-function login(username, role, showToastData = true) {
+function login(username, role, showWelcome = true) {
     currentUser = username;
     currentRole = role;
-
-    // Save session
     localStorage.setItem('titan_user', username);
     localStorage.setItem('titan_role', role);
-
-    // Update UI info
-    document.querySelectorAll('.current-user-name').forEach(el => {
-        el.textContent = username;
-    });
-
-    // Switch screen
+    document.querySelectorAll('.current-user-name').forEach(el => el.textContent = username);
     switchScreen(role === 'supervisor' ? 'supervisor' : 'worker');
-
-    if (showToastData) {
-        showToast(`Hoş geldin, ${username} (${role === 'supervisor' ? 'Amir' : 'Usta'})`, 'login');
-    }
-
+    if (showWelcome) showToast(`Hoş geldin, ${username}!`, 'waving_hand');
     listenForTasks();
     listenForLeaves();
+    listenForMaterials();
 }
 
 function logout() {
-    currentUser = null;
-    currentRole = null;
-    localStorage.removeItem('titan_user');
-    localStorage.removeItem('titan_role');
+    currentUser = null; currentRole = null;
+    localStorage.removeItem('titan_user'); localStorage.removeItem('titan_role');
+    if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+    if (leavesUnsubscribe) { leavesUnsubscribe(); leavesUnsubscribe = null; }
+    if (materialsUnsubscribe) { materialsUnsubscribe(); materialsUnsubscribe = null; }
     switchScreen('login');
     showToast('Çıkış yapıldı', 'logout');
-    if (unsubscribe) {
-        unsubscribe();
-        unsubscribe = null;
-    }
-    if (leavesUnsubscribe) {
-        leavesUnsubscribe();
-        leavesUnsubscribe = null;
-    }
+    fetchUsers(); // Refresh login list
 }
 
 function switchScreen(screenName) {
-    Object.values(screens).forEach(screen => {
-        screen.classList.remove('active');
-    });
+    Object.values(screens).forEach(s => s.classList.remove('active'));
     screens[screenName].classList.add('active');
-
-    // Reset tabs to default (tasks) when switching screens
     if (screenName === 'supervisor') {
         window.switchTab('supervisor', 'tasks', document.querySelector('#supervisor-screen .nav-item'));
     } else if (screenName === 'worker') {
@@ -256,31 +306,26 @@ function switchScreen(screenName) {
     }
 }
 
-window.switchTab = function (role, tabName, navItemElement) {
-    // Hide all tabs for this role
+window.switchTab = function (role, tabName, navItem) {
     const prefix = role === 'supervisor' ? 'sup' : 'wrk';
-    const allTabs = document.querySelectorAll(`#${role}-screen .tab-content`);
-    allTabs.forEach(tab => tab.classList.remove('active'));
-
-    // Remove active class from all nav items
-    const allNavs = document.querySelectorAll(`#${role}-screen .nav-item`);
-    allNavs.forEach(nav => nav.classList.remove('active'));
-
-    // Show target tab
-    document.getElementById(`${prefix}-tab-${tabName}`).classList.add('active');
-
-    // Highlight clicked nav item
-    if (navItemElement) {
-        navItemElement.classList.add('active');
+    document.querySelectorAll(`#${role}-screen .tab-content`).forEach(t => t.classList.remove('active'));
+    document.querySelectorAll(`#${role}-screen .nav-item`).forEach(n => n.classList.remove('active'));
+    const tab = document.getElementById(`${prefix}-tab-${tabName}`);
+    if (tab) tab.classList.add('active');
+    if (navItem) navItem.classList.add('active');
+    if (tabName === 'profile') renderSystemUsers();
+    if (tabName === 'calendar') {
+        renderLeaveCalendar();
+        if (role === 'supervisor') renderSupervisorLeaves();
     }
-
-    // Refresh user list if profile tab is opened
-    if (tabName === 'profile') {
-        renderSystemUsers();
+    if (tabName === 'materials') {
+        if (role === 'supervisor') renderSupervisorMaterials();
+        if (role === 'worker') renderWorkerMaterials();
     }
-}
+};
 
-// Resizes and converts image to base64
+// ─── TASK FUNCTIONS ─────────────────────────────────────────
+
 function compressImage(file, maxWidth = 800) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -290,775 +335,567 @@ function compressImage(file, maxWidth = 800) {
             img.src = event.target.result;
             img.onload = () => {
                 const canvas = document.createElement('canvas');
-                let width = img.width;
-                let height = img.height;
-
-                if (width > maxWidth) {
-                    height = Math.round((height * maxWidth) / width);
-                    width = maxWidth;
-                }
-
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-
-                // Compress to JPEG with 0.7 quality to keep size small enough for Firestore
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-                resolve(dataUrl);
+                let w = img.width, h = img.height;
+                if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
+                canvas.width = w; canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                resolve(canvas.toDataURL('image/jpeg', 0.7));
             };
-            img.onerror = error => reject(error);
+            img.onerror = reject;
         };
-        reader.onerror = error => reject(error);
+        reader.onerror = reject;
     });
 }
 
 async function addTask(title, worker, priority, file = null) {
     let imageUrl = null;
-
-    // Convert image to base64 if selected
     if (file) {
-        try {
-            imageUrl = await compressImage(file);
-        } catch (error) {
-            console.error("Error processing image:", error);
-            showToast('Resim işlenemedi, sadece metin eklenecek.', 'error');
-        }
+        try { imageUrl = await compressImage(file); }
+        catch (e) { showToast('Resim işlenemedi.', 'error'); }
     }
-
-    const newTask = {
-        title,
-        worker,
-        priority,
-        status: 'pending',
-        timestamp: new Date().toISOString(),
-        imageUrl: imageUrl, // Save image URL if exists
-        completedImageUrl: null
-    };
-
     try {
-        const docRef = await window.addDoc(window.collection(window.db, "tasks"), newTask);
+        await window.addDoc(window.collection(window.db, "tasks"), {
+            title, worker, priority, status: 'pending',
+            timestamp: new Date().toISOString(),
+            imageUrl, completedImageUrl: null
+        });
         showToast('Görev başarıyla atandı!', 'task_alt');
     } catch (e) {
-        console.error("Error adding document: ", e);
         showToast('Görev eklenirken hata oluştu!', 'error');
     }
 }
 
 async function updateTaskStatus(taskId, newStatus) {
     try {
-        const taskRef = window.doc(window.db, "tasks", taskId);
-        await window.updateDoc(taskRef, {
-            status: newStatus
-        });
-
-        const statusMsgs = {
-            'progress': 'Görev başlatıldı',
-            'completed': 'Görev tamamlandı!'
-        };
-        showToast(statusMsgs[newStatus], 'update');
-    } catch (e) {
-        console.error("Error updating document: ", e);
-        showToast('Durum güncellenemedi!', 'error');
-    }
+        await window.updateDoc(window.doc(window.db, "tasks", taskId), { status: newStatus });
+        const msgs = { progress: 'Görev başlatıldı', completed: 'Görev tamamlandı!' };
+        showToast(msgs[newStatus] || 'Güncellendi', 'check');
+    } catch (e) { showToast('Durum güncellenemedi!', 'error'); }
 }
 
 function listenForTasks() {
     if (unsubscribe) unsubscribe();
-
     const q = window.query(window.collection(window.db, "tasks"), window.orderBy("timestamp", "desc"));
-
-    unsubscribe = window.onSnapshot(q, (querySnapshot) => {
+    unsubscribe = window.onSnapshot(q, (snap) => {
         tasks = [];
-        querySnapshot.forEach((doc) => {
-            tasks.push({ id: doc.id, ...doc.data() });
-        });
+        snap.forEach(d => tasks.push({ id: d.id, ...d.data() }));
         renderTasks();
     });
 }
 
 function renderTasks() {
-    if (currentRole === 'supervisor') {
-        renderSupervisorTasks();
-        updateStats();
-    } else if (currentRole === 'worker') {
-        renderWorkerTasks();
-    }
+    if (currentRole === 'supervisor') { renderSupervisorTasks(); updateStats(); }
+    else if (currentRole === 'worker') { renderWorkerTasks(); }
 }
 
 function updateStats() {
-    const counts = {
-        pending: tasks.filter(t => t.status === 'pending').length,
-        progress: tasks.filter(t => t.status === 'progress').length,
-        completed: tasks.filter(t => t.status === 'completed').length
-    };
-
-    document.getElementById('sup-pending-count').textContent = `${counts.pending} Bekliyor`;
-    document.getElementById('sup-progress-count').textContent = `${counts.progress} Devam Ediyor`;
-    document.getElementById('sup-completed-count').textContent = `${counts.completed} Biten`;
+    const c = { pending: 0, progress: 0, completed: 0 };
+    tasks.forEach(t => { if (c[t.status] !== undefined) c[t.status]++; });
+    const pe = document.getElementById('sup-pending-count');
+    const pr = document.getElementById('sup-progress-count');
+    const co = document.getElementById('sup-completed-count');
+    if (pe) pe.textContent = c.pending + ' Bekliyor';
+    if (pr) pr.textContent = c.progress + ' Devam';
+    if (co) co.textContent = c.completed + ' Bitti';
 }
 
-function listenForLeaves() {
-    if (leavesUnsubscribe) leavesUnsubscribe();
-    const q = window.query(window.collection(window.db, "leaves"), window.orderBy("timestamp", "desc"));
-    leavesUnsubscribe = window.onSnapshot(q, (querySnapshot) => {
-        leaves = [];
-        querySnapshot.forEach((doc) => {
-            leaves.push({ id: doc.id, ...doc.data() });
-        });
+window.filterTasks = function (filter, btn) {
+    currentTaskFilter = filter;
+    document.querySelectorAll('#sup-tab-tasks .filter-tab').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    renderSupervisorTasks();
+};
 
-        if (currentRole === 'supervisor') {
-            renderSupervisorLeaves();
-        }
-    });
-}
+window.filterWorkerTasks = function (filter, btn) {
+    currentWorkerTaskFilter = filter;
+    document.querySelectorAll('#wrk-tab-tasks .filter-tab').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    renderWorkerTasks();
+};
 
 function renderSupervisorTasks() {
-    supervisorTasks.innerHTML = '';
+    if (!supervisorTasks) return;
+    const filtered = currentTaskFilter === 'all' ? tasks : tasks.filter(t => t.status === currentTaskFilter);
 
-    if (tasks.length === 0) {
-        supervisorTasks.innerHTML = '<div class="hint">Henüz görev atamadınız.</div>';
+    if (filtered.length === 0) {
+        supervisorTasks.innerHTML = `<div class="empty-state"><span class="material-icons-round" style="font-size:3rem;opacity:.3">assignment</span><p>Bu filtrede görev yok.</p></div>`;
         return;
     }
+    supervisorTasks.innerHTML = '';
+    filtered.forEach(task => {
+        const statusMap = {
+            pending: { icon: 'schedule', text: 'Bekliyor', cls: 'pending' },
+            progress: { icon: 'engineering', text: 'Devam Ediyor', cls: 'progress' },
+            completed: { icon: 'check_circle', text: 'Tamamlandı', cls: 'completed' }
+        };
+        const s = statusMap[task.status] || statusMap.pending;
+        const time = new Date(task.timestamp).toLocaleString('tr-TR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' });
 
-    tasks.forEach(task => {
-        const priorityClass = task.priority === 'high' ? 'priority-high' : '';
-        const statusClass = `status-${task.status}`;
+        const seenHtml = task.seenAt
+            ? `<span class="chip chip-blue"><span class="material-icons-round">done_all</span> ${new Date(task.seenAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span>`
+            : `<span class="chip chip-muted"><span class="material-icons-round">check</span> İletildi</span>`;
 
-        let statusIcon, statusText;
-        if (task.status === 'pending') { statusIcon = 'schedule'; statusText = 'Bekliyor'; }
-        else if (task.status === 'progress') { statusIcon = 'engineering'; statusText = 'Yapılıyor'; }
-        else { statusIcon = 'check_circle'; statusText = 'Tamamlandı'; }
+        const imageHtml = task.imageUrl ? `<div class="task-img-wrap"><img src="${task.imageUrl}" loading="lazy"></div>` : '';
+        const compImgHtml = task.completedImageUrl ? `<div class="task-img-wrap completed-img"><div class="img-label"><span class="material-icons-round">done_all</span> Tamamlandı</div><img src="${task.completedImageUrl}" loading="lazy"></div>` : '';
+        const matHtml = task.materialRequest ? `<div class="material-alert"><span class="material-icons-round">warning_amber</span> <strong>Eksik Malzeme:</strong> ${task.materialRequest}</div>` : '';
 
-        const timeString = new Date(task.timestamp).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-
-        let imageHtml = '';
-        if (task.imageUrl) {
-            imageHtml = `
-            <div class="task-image-container">
-                <img src="${task.imageUrl}" alt="Görev Görseli" loading="lazy">
-            </div>`;
-        }
-
-        if (task.completedImageUrl) {
-            imageHtml += `
-            <div class="task-image-container" style="border-color: var(--clr-status-completed)">
-                <div style="padding:4px 8px; font-size: 0.8rem; background: rgba(16, 185, 129, 0.2); color: #34d399;">Tamamlanan İşlem:</div>
-                <img src="${task.completedImageUrl}" alt="Tamamlanan İşlem Görseli" loading="lazy">
-            </div>`;
-        }
-
-        let seenHtml = '';
-        if (task.seenAt) {
-            const seenTime = new Date(task.seenAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-            seenHtml = `
-            <div class="meta-item" title="Görüldü Zamanı" style="color: #60a5fa;">
-                <span class="material-icons-round" style="font-size: 1rem;">done_all</span>
-                ${seenTime}
-            </div>`;
-        } else {
-            seenHtml = `
-            <div class="meta-item" title="İletildi, henüz bakılmadı" style="opacity: 0.5;">
-                <span class="material-icons-round" style="font-size: 1rem;">check</span>
-                İletildi
-            </div>`;
-        }
-
-        let materialHtml = '';
-        if (task.materialRequest) {
-            materialHtml = `
-                <div style="margin-top:0.5rem; padding: 0.75rem; background: rgba(245, 158, 11, 0.1); border-left: 3px solid #f59e0b; font-size: 0.85rem; color: #fcd34d; border-radius: 0 4px 4px 0;">
-                    <span class="material-icons-round" style="font-size: 1rem; vertical-align: middle; margin-right: 0.3rem;">warning</span>
-                    <strong>Eksik Malzeme İsteniyor:</strong> ${task.materialRequest}
-                </div>
-            `;
-        }
-
-        const html = `
-            <div class="task-card ${priorityClass} ${statusClass}">
+        supervisorTasks.insertAdjacentHTML('beforeend', `
+            <div class="task-card priority-${task.priority}">
                 <div class="task-header">
                     <div class="task-title">${task.title}</div>
-                    <div class="task-time">${timeString}</div>
+                    <div class="task-time">${time}</div>
                 </div>
-                <div class="task-meta">
-                    <div class="meta-item" title="Atanan Usta">
-                        <span class="material-icons-round">person</span>
-                        ${task.worker}
-                    </div>
-                    <div class="meta-item status-text-${task.status}" title="Durum">
-                        <span class="material-icons-round">${statusIcon}</span>
-                        ${statusText}
-                    </div>
+                <div class="task-chips">
+                    <span class="chip chip-${s.cls}"><span class="material-icons-round">${s.icon}</span> ${s.text}</span>
+                    <span class="chip chip-muted"><span class="material-icons-round">person</span> ${task.worker}</span>
                     ${seenHtml}
                 </div>
-                ${imageHtml}
-                ${materialHtml}
+                ${imageHtml}${compImgHtml}${matHtml}
                 <div class="task-actions">
-                    <button class="action-btn" style="background: rgba(239, 68, 68, 0.1); color: var(--clr-status-urgent); border: 1px solid rgba(239, 68, 68, 0.3);" onclick="deleteTask('${task.id}')">
-                        <span class="material-icons-round">delete_outline</span> Sil
+                    <button class="action-btn danger" onclick="window.deleteTask('${task.id}')">
+                        <span class="material-icons-round">delete</span> Sil
                     </button>
                 </div>
             </div>
-        `;
-        supervisorTasks.insertAdjacentHTML('beforeend', html);
+        `);
     });
 }
 
 function renderWorkerTasks() {
-    workerTasks.innerHTML = '';
-
-    // Filter tasks only for the currently logged in worker
+    if (!workerTasks) return;
     const myTasks = tasks.filter(t => t.worker === currentUser);
+    const filtered = currentWorkerTaskFilter === 'all' ? myTasks : myTasks.filter(t => t.status === currentWorkerTaskFilter);
 
-    if (myTasks.length === 0) {
-        workerTasks.innerHTML = '<div class="hint">Size atanmış görev bulunmuyor.</div>';
+    if (filtered.length === 0) {
+        workerTasks.innerHTML = `<div class="empty-state"><span class="material-icons-round" style="font-size:3rem;opacity:.3">assignment</span><p>Bu filtrede görev yok.</p></div>`;
         return;
     }
+    workerTasks.innerHTML = '';
+    filtered.forEach(task => {
+        // Mark as seen
+        if (!task.seenAt && task.status === 'pending') markTaskAsSeen(task.id);
 
-    myTasks.forEach(task => {
-        // Log "seen" receipt if not already recorded
-        if (!task.seenAt && task.status === 'pending') {
-            markTaskAsSeen(task.id);
-        }
-
-        const priorityClass = task.priority === 'high' ? 'priority-high' : '';
-        const statusClass = `status-${task.status}`;
-
-        let statusIcon, statusText;
-        if (task.status === 'pending') { statusIcon = 'schedule'; statusText = 'Bekliyor'; }
-        else if (task.status === 'progress') { statusIcon = 'engineering'; statusText = 'Yapılıyor'; }
-        else { statusIcon = 'check_circle'; statusText = 'Tamamlandı'; }
-
-        const timeString = new Date(task.timestamp).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-
-        let imageHtml = '';
-        if (task.imageUrl) {
-            imageHtml = `
-            <div class="task-image-container">
-                <img src="${task.imageUrl}" alt="Görev Görseli" loading="lazy">
-            </div>`;
-        }
-
-        if (task.completedImageUrl) {
-            imageHtml += `
-            <div class="task-image-container" style="border-color: var(--clr-status-completed)">
-                <div style="padding:4px 8px; font-size: 0.8rem; background: rgba(16, 185, 129, 0.2); color: #34d399;">Tarafınızdan Biten İşlem:</div>
-                <img src="${task.completedImageUrl}" alt="Tamamlanan İşlem Görseli" loading="lazy">
-            </div>`;
-        }
+        const statusMap = {
+            pending: { icon: 'schedule', text: 'Bekliyor', cls: 'pending' },
+            progress: { icon: 'engineering', text: 'Devam Ediyor', cls: 'progress' },
+            completed: { icon: 'check_circle', text: 'Tamamlandı', cls: 'completed' }
+        };
+        const s = statusMap[task.status] || statusMap.pending;
+        const time = new Date(task.timestamp).toLocaleString('tr-TR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' });
+        const imageHtml = task.imageUrl ? `<div class="task-img-wrap"><img src="${task.imageUrl}" loading="lazy"></div>` : '';
+        const compImgHtml = task.completedImageUrl ? `<div class="task-img-wrap completed-img"><div class="img-label"><span class="material-icons-round">done_all</span> Tamamladığınız İşlem</div><img src="${task.completedImageUrl}" loading="lazy"></div>` : '';
 
         let actionsHtml = '';
         if (task.status === 'pending') {
-            actionsHtml = `
-                <div class="task-actions">
-                    <button class="action-btn start" onclick="updateTaskStatus('${task.id}', 'progress')">
-                        <span class="material-icons-round">play_arrow</span> Başla
-                    </button>
-                </div>
-            `;
+            actionsHtml = `<div class="task-actions"><button class="action-btn success" onclick="updateTaskStatus('${task.id}','progress')"><span class="material-icons-round">play_arrow</span> Başla</button></div>`;
         } else if (task.status === 'progress') {
-            // Include a mini form to upload an image when completing
             actionsHtml = `
-                <div class="file-upload-group" style="margin-top: 1rem;">
-                     <input type="file" id="complete-image-${task.id}" accept="image/*" class="file-input" onchange="previewCompleteImage(this, '${task.id}')">
-                     <label for="complete-image-${task.id}" class="file-label" style="font-size:0.8rem; padding: 0.5rem;">
-                         <span class="material-icons-round" style="font-size: 1.2rem;">add_a_photo</span>
-                         <span id="complete-file-name-${task.id}">Bitmiş Halinin Fotoğrafı (Ops)</span>
-                     </label>
-                     <img id="complete-preview-${task.id}" class="image-preview" style="display: none; max-height: 100px;" />
+                <div class="file-upload-group" style="margin-top:.8rem">
+                    <input type="file" id="ci-${task.id}" accept="image/*" class="file-input" onchange="previewCompleteImage(this,'${task.id}')">
+                    <label for="ci-${task.id}" class="file-label" style="font-size:.85rem;padding:.5rem">
+                        <span class="material-icons-round">add_a_photo</span>
+                        <span id="cf-${task.id}">Tamamlanan Fotoğrafı (Ops.)</span>
+                    </label>
+                    <img id="cp-${task.id}" class="image-preview" style="display:none;max-height:100px">
                 </div>
                 <div class="task-actions">
-                    <button class="action-btn complete" onclick="completeTaskWithImage('${task.id}')" id="btn-complete-${task.id}">
-                        <span class="material-icons-round">done_all</span> Bitir
+                    <button class="action-btn success" id="btn-c-${task.id}" onclick="completeTaskWithImage('${task.id}')">
+                        <span class="material-icons-round">done_all</span> Tamamla
                     </button>
-                </div>
-            `;
+                </div>`;
         }
 
-        let materialHtml = '';
-        if (task.materialRequest) {
-            materialHtml = `
-                <div style="margin-top:0.5rem; padding: 0.75rem; background: rgba(245, 158, 11, 0.1); border-left: 3px solid #f59e0b; font-size: 0.85rem; color: #fcd34d; border-radius: 0 4px 4px 0;">
-                    <strong>Malzeme Talebiniz:</strong> ${task.materialRequest}
-                </div>
-            `;
-        } else if (task.status !== 'completed') {
-            materialHtml = `
-                <div style="margin-top: 0.5rem;">
-                    <button class="action-btn" style="background: rgba(245, 158, 11, 0.1); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.3); padding: 0.5rem; font-size: 0.8rem; height: auto;" onclick="requestMaterial('${task.id}')">
-                        <span class="material-icons-round" style="font-size: 1rem;">build_circle</span> Eksik Malzeme İste
-                    </button>
-                </div>
-            `;
-        }
-
-        const html = `
-            <div class="task-card ${priorityClass} ${statusClass}">
+        workerTasks.insertAdjacentHTML('beforeend', `
+            <div class="task-card priority-${task.priority}">
                 <div class="task-header">
                     <div class="task-title">${task.title}</div>
-                    <div class="task-time">${timeString}</div>
+                    <div class="task-time">${time}</div>
                 </div>
-                ${imageHtml}
-                <div class="task-meta" style="margin-top: 0.5rem;">
-                     <div class="meta-item" title="Atanan Usta">
-                        <span class="material-icons-round">person</span>
-                        ${task.worker}
-                    </div>
-                    <div class="meta-item status-text-${task.status}">
-                        <span class="material-icons-round">${statusIcon}</span>
-                        ${statusText}
-                    </div>
+                <div class="task-chips">
+                    <span class="chip chip-${s.cls}"><span class="material-icons-round">${s.icon}</span> ${s.text}</span>
                 </div>
-                ${materialHtml}
+                ${imageHtml}${compImgHtml}
                 ${actionsHtml}
             </div>
-        `;
-        workerTasks.insertAdjacentHTML('beforeend', html);
+        `);
     });
 }
 
 async function markTaskAsSeen(taskId) {
     try {
-        const taskRef = window.doc(window.db, "tasks", taskId);
-        await window.updateDoc(taskRef, {
-            seenAt: new Date().toISOString()
-        });
-    } catch (e) {
-        console.error("Seen receipt could not be sent", e);
-    }
+        await window.updateDoc(window.doc(window.db, "tasks", taskId), { seenAt: new Date().toISOString() });
+    } catch (e) { /* silent */ }
 }
 
 window.deleteTask = async function (taskId) {
-    if (confirm("Bu görevi geri dönüşümsüz olarak silmek istediğinize emin misiniz?")) {
+    if (confirm("Bu görevi silmek istediğinize emin misiniz?")) {
         try {
             await window.deleteDoc(window.doc(window.db, "tasks", taskId));
-            showToast('Görev başarıyla silindi', 'delete');
-        } catch (e) {
-            console.error("Error deleting document: ", e);
-            showToast('Görev silinirken hata oluştu', 'error');
-        }
+            showToast('Görev silindi.', 'delete');
+        } catch (e) { showToast('Silinemedi!', 'error'); }
     }
+};
+
+window.previewCompleteImage = function (input, taskId) {
+    const file = input.files[0];
+    const nameEl = document.getElementById(`cf-${taskId}`);
+    const prevEl = document.getElementById(`cp-${taskId}`);
+    if (file) {
+        if (nameEl) nameEl.textContent = file.name;
+        const r = new FileReader();
+        r.onload = e => { if (prevEl) { prevEl.src = e.target.result; prevEl.style.display = 'block'; } };
+        r.readAsDataURL(file);
+    }
+};
+
+window.completeTaskWithImage = async function (taskId) {
+    const fileInput = document.getElementById(`ci-${taskId}`);
+    const btn = document.getElementById(`btn-c-${taskId}`);
+    let completedImageUrl = null;
+    if (fileInput && fileInput.files[0]) {
+        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-icons-round spinning">sync</span> İşleniyor...'; }
+        try { completedImageUrl = await compressImage(fileInput.files[0]); }
+        catch (e) { showToast('Resim işleme hatası!', 'error'); if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-icons-round">done_all</span> Tamamla'; } return; }
+    }
+    try {
+        const data = { status: 'completed' };
+        if (completedImageUrl) data.completedImageUrl = completedImageUrl;
+        await window.updateDoc(window.doc(window.db, "tasks", taskId), data);
+        showToast('Görev tamamlandı!', 'done_all');
+    } catch (e) { showToast('Durum güncellenemedi!', 'error'); if (btn) { btn.disabled = false; } }
+};
+
+// ─── LEAVE FUNCTIONS ────────────────────────────────────────
+
+function listenForLeaves() {
+    if (leavesUnsubscribe) leavesUnsubscribe();
+    const q = window.query(window.collection(window.db, "leaves"), window.orderBy("timestamp", "desc"));
+    leavesUnsubscribe = window.onSnapshot(q, (snap) => {
+        leaves = [];
+        snap.forEach(d => leaves.push({ id: d.id, ...d.data() }));
+        if (currentRole === 'supervisor') renderSupervisorLeaves();
+        renderLeaveCalendar();
+    });
 }
 
-window.requestMaterial = async function (taskId) {
-    const item = prompt("Hangi malzeme eksik?");
-    if (item && item.trim() !== '') {
-        try {
-            const taskRef = window.doc(window.db, "tasks", taskId);
-            await window.updateDoc(taskRef, {
-                materialRequest: item.trim()
-            });
-            showToast('Malzeme talebi amire iletildi.', 'shopping_cart_checkout');
-        } catch (e) {
-            console.error("Material req error: ", e);
-            showToast('Talep gönderilemedi.', 'error');
-        }
-    }
-}
-
-// Yıllık İzin İşlemleri
-if (leaveForm) {
-    leaveForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const Btn = document.getElementById('submit-leave-btn');
-        const start = document.getElementById('leave-start').value;
-        const end = document.getElementById('leave-end').value;
-
-        if (start && end) {
-            Btn.disabled = true;
-            Btn.innerHTML = '<span class="material-icons-round">hourglass_empty</span> Gönderiliyor...';
-
-            const newLeave = {
-                worker: currentUser,
-                start: start,
-                end: end,
-                status: 'pending',
-                timestamp: new Date().toISOString()
-            };
-
-            try {
-                await window.addDoc(window.collection(window.db, "leaves"), newLeave);
-                showToast('İzin talebi gönderildi.', 'event_available');
-                leaveForm.reset();
-            } catch (error) {
-                console.error("Leave error: ", error);
-                showToast('İzin talebi gönderilemedi.', 'error');
-            }
-
-            Btn.disabled = false;
-            Btn.innerHTML = '<span class="material-icons-round">send</span> İzin Talebi Gönder';
-        }
+function renderSupervisorLeaves() {
+    const list = document.getElementById('supervisor-leaves');
+    if (!list) return;
+    if (leaves.length === 0) { list.innerHTML = '<div class="empty-state">Henüz izin talebi yok.</div>'; return; }
+    list.innerHTML = '';
+    leaves.forEach(lv => {
+        const sd = new Date(lv.start).toLocaleDateString('tr-TR');
+        const ed = new Date(lv.end).toLocaleDateString('tr-TR');
+        const statusMap = {
+            pending: { cls: 'pending', label: 'Bekliyor' },
+            approved: { cls: 'completed', label: 'Onaylandı' },
+            rejected: { cls: 'urgent', label: 'Reddedildi' }
+        };
+        const st = statusMap[lv.status] || statusMap.pending;
+        const actions = lv.status === 'pending' ? `
+            <div class="task-actions" style="gap:.5rem;margin-top:.8rem">
+                <button class="action-btn success" onclick="window.updateLeaveStatus('${lv.id}','approved')">
+                    <span class="material-icons-round">thumb_up</span> Onayla
+                </button>
+                <button class="action-btn danger" onclick="window.updateLeaveStatus('${lv.id}','rejected')">
+                    <span class="material-icons-round">thumb_down</span> Reddet
+                </button>
+            </div>` : '';
+        list.insertAdjacentHTML('beforeend', `
+            <div class="task-card">
+                <div class="task-header">
+                    <div class="task-title"><span class="material-icons-round" style="font-size:1rem;vertical-align:middle">person</span> ${lv.worker}</div>
+                </div>
+                <div class="task-chips">
+                    <span class="chip chip-muted"><span class="material-icons-round">date_range</span> ${sd} → ${ed}</span>
+                    <span class="chip chip-${st.cls}">${st.label}</span>
+                </div>
+                ${actions}
+            </div>
+        `);
     });
 }
 
 window.updateLeaveStatus = async function (leaveId, status) {
     try {
         await window.updateDoc(window.doc(window.db, "leaves", leaveId), { status });
-        showToast('İzin durumu güncellendi', 'update');
-    } catch (e) {
-        console.error(e);
-        showToast('Durum güncellenemedi', 'error');
-    }
-}
+        showToast(status === 'approved' ? 'İzin onaylandı.' : 'İzin reddedildi.', status === 'approved' ? 'thumb_up' : 'thumb_down');
+    } catch (e) { showToast('Durum güncellenemedi', 'error'); }
+};
 
-function renderSupervisorLeaves() {
-    const list = document.getElementById('supervisor-leaves');
-    if (!list) return;
-    list.innerHTML = '';
-
-    if (leaves.length === 0) {
-        list.innerHTML = '<div class="hint">Bekleyen veya onaylanmış izin talebi yok.</div>';
-        return;
-    }
-
-    leaves.forEach(lv => {
-        let statusBadge = '';
-        let actions = '';
-
-        // Format dates
-        const startDate = new Date(lv.start).toLocaleDateString('tr-TR');
-        const endDate = new Date(lv.end).toLocaleDateString('tr-TR');
-
-        if (lv.status === 'pending') {
-            statusBadge = `<span style="color:var(--clr-status-pending)">Bekliyor</span>`;
-            actions = `
-                <button class="action-btn" style="background: rgba(16, 185, 129, 0.1); color: var(--clr-status-completed); border: 1px solid rgba(16, 185, 129, 0.3);" onclick="updateLeaveStatus('${lv.id}', 'approved')">
-                    <span class="material-icons-round">thumb_up</span> Onayla
-                </button>
-                <button class="action-btn" style="background: rgba(239, 68, 68, 0.1); color: var(--clr-status-urgent); border: 1px solid rgba(239, 68, 68, 0.3);" onclick="updateLeaveStatus('${lv.id}', 'rejected')">
-                    <span class="material-icons-round">thumb_down</span> Reddet
-                </button>
-            `;
-        } else if (lv.status === 'approved') {
-            statusBadge = `<span style="color:var(--clr-status-completed)">Onaylandı</span>`;
-        } else {
-            statusBadge = `<span style="color:var(--clr-status-urgent)">Reddedildi</span>`;
+function renderLeaveCalendar() {
+    const approved = leaves.filter(l => l.status === 'approved');
+    const containers = ['leave-calendar-view', 'wrk-leave-calendar-view'];
+    containers.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (approved.length === 0) {
+            el.innerHTML = '<div class="empty-state">Onaylanmış izin bulunmuyor.</div>';
+            return;
         }
-
-        const html = `
-            <div class="task-card">
-                <div class="task-header">
-                    <div class="task-title" style="font-size: 1rem;"><span class="material-icons-round" style="vertical-align: text-bottom; font-size: 1.2rem;">person</span> ${lv.worker} - İzin Talebi</div>
+        el.innerHTML = '';
+        approved.forEach(l => {
+            const sd = new Date(l.start).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long' });
+            const ed = new Date(l.end).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long' });
+            el.insertAdjacentHTML('beforeend', `
+                <div class="leave-calendar-item">
+                    <div class="lc-avatar"><span class="material-icons-round">person</span></div>
+                    <div class="lc-info">
+                        <strong>${l.worker}</strong>
+                        <span>${sd} – ${ed}</span>
+                    </div>
+                    <span class="chip chip-completed" style="flex-shrink:0">İzinli</span>
                 </div>
-                <div class="task-meta" style="margin-top: 0.5rem;">
-                    <div class="meta-item"><span class="material-icons-round">calendar_today</span> ${startDate} - ${endDate}</div>
-                    <div class="meta-item">${statusBadge}</div>
-                </div>
-                ${actions ? `<div class="task-actions" style="margin-top:0.8rem">${actions}</div>` : ''}
-            </div>
-        `;
-        list.insertAdjacentHTML('beforeend', html);
+            `);
+        });
     });
 }
 
-function previewCompleteImage(inputElem, taskId) {
-    const file = inputElem.files[0];
-    const fileNameDisplay = document.getElementById(`complete-file-name-${taskId}`);
-    const imagePreview = document.getElementById(`complete-preview-${taskId}`);
+// ─── MATERIAL REQUEST FUNCTIONS ─────────────────────────────
 
-    if (file) {
-        fileNameDisplay.textContent = file.name;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            imagePreview.src = e.target.result;
-            imagePreview.style.display = 'block';
+function listenForMaterials() {
+    if (materialsUnsubscribe) materialsUnsubscribe();
+    const q = window.query(window.collection(window.db, "materials"), window.orderBy("timestamp", "desc"));
+    materialsUnsubscribe = window.onSnapshot(q, (snap) => {
+        materials = [];
+        snap.forEach(d => materials.push({ id: d.id, ...d.data() }));
+        if (currentRole === 'supervisor') renderSupervisorMaterials();
+        renderWorkerMaterials();
+    });
+}
+
+function renderSupervisorMaterials() {
+    const list = document.getElementById('supervisor-materials');
+    if (!list) return;
+    if (materials.length === 0) { list.innerHTML = '<div class="empty-state">Malzeme talebi yok.</div>'; return; }
+    list.innerHTML = '';
+    materials.forEach(m => {
+        const statusMap = {
+            pending: { cls: 'pending', label: 'Bekliyor' },
+            resolved: { cls: 'completed', label: 'Çözüldü' }
         };
-        reader.readAsDataURL(file);
-    } else {
-        fileNameDisplay.textContent = 'Bitmiş Halinin Fotoğrafı (Ops)';
-        imagePreview.style.display = 'none';
-        imagePreview.src = '';
-    }
+        const st = statusMap[m.status] || statusMap.pending;
+        const commentsHtml = (m.comments || []).map(c =>
+            `<div class="comment ${c.role}"><strong>${c.author}:</strong> ${c.text}</div>`
+        ).join('');
+        list.insertAdjacentHTML('beforeend', `
+            <div class="task-card">
+                <div class="task-header">
+                    <div class="task-title"><span class="material-icons-round" style="font-size:1rem;vertical-align:middle">inventory_2</span> ${m.name}</div>
+                </div>
+                <div class="task-chips">
+                    <span class="chip chip-muted"><span class="material-icons-round">person</span> ${m.worker}</span>
+                    <span class="chip chip-${st.cls}">${st.label}</span>
+                </div>
+                ${m.desc ? `<p class="mat-desc">${m.desc}</p>` : ''}
+                <div class="comments-section">${commentsHtml}</div>
+                <div class="comment-form">
+                    <input type="text" class="comment-input" id="mc-${m.id}" placeholder="Yorum ekle...">
+                    <button class="action-btn" onclick="window.addComment('${m.id}')"><span class="material-icons-round">send</span></button>
+                </div>
+                <div class="task-actions" style="margin-top:.5rem">
+                    ${m.status === 'pending' ? `<button class="action-btn success" onclick="window.resolveMaterial('${m.id}')"><span class="material-icons-round">check_circle</span> Çözüldü</button>` : ''}
+                    <button class="action-btn danger" onclick="window.deleteMaterial('${m.id}')"><span class="material-icons-round">delete</span> Sil</button>
+                </div>
+            </div>
+        `);
+    });
 }
 
-async function completeTaskWithImage(taskId) {
-    const fileInput = document.getElementById(`complete-image-${taskId}`);
-    const btn = document.getElementById(`btn-complete-${taskId}`);
-    let completedImageUrl = null;
+function renderWorkerMaterials() {
+    const list = document.getElementById('worker-materials');
+    if (!list) return;
+    const myMats = materials.filter(m => m.worker === currentUser);
+    if (myMats.length === 0) { list.innerHTML = '<div class="empty-state">Henüz malzeme talebiniz yok.</div>'; return; }
+    list.innerHTML = '';
+    myMats.forEach(m => {
+        const statusMap = {
+            pending: { cls: 'pending', label: 'Bekliyor' },
+            resolved: { cls: 'completed', label: 'Çözüldü' }
+        };
+        const st = statusMap[m.status] || statusMap.pending;
+        const commentsHtml = (m.comments || []).map(c =>
+            `<div class="comment ${c.role}"><strong>${c.author}:</strong> ${c.text}</div>`
+        ).join('');
+        list.insertAdjacentHTML('beforeend', `
+            <div class="task-card">
+                <div class="task-header">
+                    <div class="task-title">${m.name}</div>
+                </div>
+                <div class="task-chips">
+                    <span class="chip chip-${st.cls}">${st.label}</span>
+                </div>
+                ${m.desc ? `<p class="mat-desc">${m.desc}</p>` : ''}
+                <div class="comments-section">${commentsHtml}</div>
+                <div class="comment-form">
+                    <input type="text" class="comment-input" id="mc-${m.id}" placeholder="Yorum ekle...">
+                    <button class="action-btn" onclick="window.addComment('${m.id}')"><span class="material-icons-round">send</span></button>
+                </div>
+            </div>
+        `);
+    });
+}
 
-    if (fileInput && fileInput.files[0]) {
-        btn.disabled = true;
-        btn.innerHTML = '<span class="material-icons-round">sync</span> İşleniyor...';
-        showToast('Fotoğraf işleniyor, lütfen bekleyin...', 'cloud_upload');
-
-        try {
-            const file = fileInput.files[0];
-            completedImageUrl = await compressImage(file);
-        } catch (error) {
-            console.error("Error compressing completion image:", error);
-            showToast('Resim işleme hatası!', 'error');
-            btn.disabled = false;
-            btn.innerHTML = '<span class="material-icons-round">done_all</span> Bitir';
-            return; // Stop completion if processing fails
-        }
-    }
-
+window.addComment = async function (materialId) {
+    const input = document.getElementById(`mc-${materialId}`);
+    if (!input || !input.value.trim()) return;
     try {
-        const taskRef = window.doc(window.db, "tasks", taskId);
-        const updateData = { status: 'completed' };
-        if (completedImageUrl) {
-            updateData.completedImageUrl = completedImageUrl;
-        }
+        const mat = materials.find(m => m.id === materialId);
+        const comments = mat ? (mat.comments || []) : [];
+        comments.push({ author: currentUser, role: currentRole, text: input.value.trim(), ts: new Date().toISOString() });
+        await window.updateDoc(window.doc(window.db, "materials", materialId), { comments });
+        input.value = '';
+        showToast('Yorum eklendi.', 'comment');
+    } catch (e) { showToast('Yorum eklenemedi.', 'error'); }
+};
 
-        await window.updateDoc(taskRef, updateData);
-        showToast('Görev tamamlandı!', 'done_all');
-    } catch (e) {
-        console.error("Error updating document: ", e);
-        showToast('Durum güncellenemedi!', 'error');
-        if (btn) btn.disabled = false;
-    }
-}
+window.resolveMaterial = async function (materialId) {
+    try {
+        await window.updateDoc(window.doc(window.db, "materials", materialId), { status: 'resolved' });
+        showToast('Talep çözüldü olarak işaretlendi.', 'check_circle');
+    } catch (e) { showToast('Güncellenemedi.', 'error'); }
+};
 
-function showToast(message, icon) {
-    const toast = document.createElement('div');
-    toast.className = 'toast';
-    toast.innerHTML = `
-        <span class="material-icons-round">${icon}</span>
-        ${message}
-    `;
-
-    toastContainer.appendChild(toast);
-
-    // Remove after 3 seconds
-    setTimeout(() => {
-        toast.style.animation = 'toastLeave 0.3s forwards';
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
-}
-
-// ==========================================
-// CANLI RADYO (ARKA PLAN OYNATMA) MANTIĞI
-// ==========================================
-
-const radioAudio = document.getElementById('radio-audio-player');
-const statusText = document.getElementById('yt-status-text');
-const playIcon = document.getElementById('yt-play-icon');
-
-window.toggleYtPlayer = function () {
-    const body = document.getElementById('yt-body');
-    const icon = document.getElementById('yt-toggle-icon');
-
-    if (body.classList.contains('active')) {
-        body.classList.remove('active');
-        icon.textContent = "expand_more";
-    } else {
-        body.classList.add('active');
-        icon.textContent = "expand_less";
+window.deleteMaterial = async function (materialId) {
+    if (confirm("Bu malzeme talebini silmek istediğinize emin misiniz?")) {
+        try {
+            await window.deleteDoc(window.doc(window.db, "materials", materialId));
+            showToast('Talep silindi.', 'delete');
+        } catch (e) { showToast('Silinemedi.', 'error'); }
     }
 };
 
-window.playRadio = function () {
-    const selectElem = document.getElementById('radio-station');
-    const streamUrl = selectElem.value;
-    const radioName = selectElem.options[selectElem.selectedIndex].text;
+// ─── USER MANAGEMENT ────────────────────────────────────────
 
-    // Check if we are resuming the same stream or starting a new one
-    if (radioAudio.src !== streamUrl) {
-        radioAudio.src = streamUrl;
-    }
-
-    // Toggle play/pause
-    if (radioAudio.paused) {
-        statusText.textContent = "Bağlanıyor...";
-        playIcon.textContent = "hourglass_empty";
-
-        radioAudio.play().then(() => {
-            statusText.textContent = radioName + " Devrede";
-            playIcon.textContent = "pause";
-            updateMediaSession(radioName, 'Titan Fabrika Radyosu');
-        }).catch(err => {
-            console.error('Radyo oynatılamadı:', err);
-            showToast("Radyo yayın akışına bağlanılamadı!", "error");
-            statusText.textContent = "Bağlantı Hatası";
-            playIcon.textContent = "play_arrow";
-        });
-    } else {
-        radioAudio.pause();
-        statusText.textContent = "Radyo Duraklatıldı.";
-        playIcon.textContent = "play_arrow";
-    }
-};
-
-window.stopRadio = function () {
-    if (!radioAudio.paused) {
-        radioAudio.pause();
-    }
-    radioAudio.src = ""; // Clear buffer
-    statusText.textContent = "Radyo Kapatıldı.";
-    playIcon.textContent = "play_arrow";
-};
-
-window.changeRadioVolume = function (val) {
-    radioAudio.volume = val / 100;
-};
-
-// Update the native mobile lock screen controls (Keeps it playing!)
-function updateMediaSession(title, artist) {
-    if ('mediaSession' in navigator) {
-        navigator.mediaSession.metadata = new MediaMetadata({
-            title: title + " (Canlı Yayın)",
-            artist: artist,
-            album: 'Çalışma Müzikleri',
-            artwork: [
-                { src: 'https://cdn-icons-png.flaticon.com/512/1055/1055183.png', sizes: '512x512', type: 'image/png' }
-            ]
-        });
-
-        navigator.mediaSession.setActionHandler('play', function () { window.playRadio(); });
-        navigator.mediaSession.setActionHandler('pause', function () { window.stopRadio(); });
-        navigator.mediaSession.setActionHandler('stop', function () { window.stopRadio(); });
-    }
-}
-
-// USER MANAGEMENT (FAZ 3)
 function renderSystemUsers() {
     const list = document.getElementById('user-management-list');
     if (!list) return;
     list.innerHTML = '';
-
-    // systemUsers array is updated via fetchUsers at init, but let's re-fetch to be sure
     fetchUsers().then(() => {
+        if (systemUsers.length === 0) { list.innerHTML = '<div class="empty-state">Kullanıcı bulunamadı.</div>'; return; }
         systemUsers.forEach(u => {
-            const roleBadge = u.role === 'supervisor'
-                ? `<span class="badge in-progress"><span class="material-icons-round" style="font-size:12px">admin_panel_settings</span> Amir</span>`
-                : `<span class="badge pending"><span class="material-icons-round" style="font-size:12px">engineering</span> Usta</span>`;
-
-            const html = `
-                <div class="task-card" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; margin-bottom: 0.5rem; background: rgba(255,255,255,0.03);">
+            const roleIcon = u.role === 'supervisor' ? 'admin_panel_settings' : 'engineering';
+            const roleLabel = u.role === 'supervisor' ? 'Amir' : 'Usta';
+            list.insertAdjacentHTML('beforeend', `
+                <div class="task-card" style="display:flex;justify-content:space-between;align-items:center;padding:.9rem;margin-bottom:.5rem">
                     <div>
-                        <div style="font-weight: 600; font-size: 1.1rem; color: var(--clr-text);">${u.name}</div>
-                        <div style="margin-top: 0.3rem; font-size: 0.85rem; color: var(--clr-text-muted); display: flex; align-items: center; gap: 0.5rem;">
-                            Şifre: <span style="font-family: monospace; background: rgba(255,255,255,0.1); padding: 0.1rem 0.4rem; border-radius: 4px; color: white;">${u.password}</span>
-                            <span class="material-icons-round" style="font-size: 1rem; cursor: pointer; color: var(--clr-primary);" onclick="window.promptEditPassword('${u.id}', '${u.name}')" title="Şifreyi Değiştir">edit</span>
+                        <div style="font-weight:600;font-size:1rem">${u.name}</div>
+                        <div style="margin-top:.3rem;font-size:.82rem;color:var(--clr-text-muted);display:flex;align-items:center;gap:.4rem">
+                            <span class="material-icons-round" style="font-size:.9rem">${roleIcon}</span> ${roleLabel}
+                            &nbsp;|&nbsp; Şifre:
+                            <span style="font-family:monospace;background:rgba(255,255,255,.08);padding:.1rem .4rem;border-radius:4px">${u.password}</span>
+                            <span class="material-icons-round" style="font-size:1rem;cursor:pointer;color:var(--clr-primary)" onclick="window.promptEditPassword('${u.id}','${u.name}')" title="Şifreyi Değiştir">edit</span>
                         </div>
                     </div>
-                    <div>
-                        ${roleBadge}
-                    </div>
                 </div>
-            `;
-            list.insertAdjacentHTML('beforeend', html);
+            `);
         });
     });
 }
 
 window.promptAddUser = async function () {
     const name = prompt("Yeni personelin Adı Soyadı:");
-    if (!name || name.trim() === '') return;
-
+    if (!name || !name.trim()) return;
     const roleInput = prompt("Rolü nedir? (amir / usta):", "usta");
     if (!roleInput) return;
     const role = roleInput.toLowerCase().trim() === 'amir' ? 'supervisor' : 'worker';
-
-    const password = prompt("Giriş için bir şifre belirleyin:", "1234");
+    const password = prompt("Giriş için şifre belirleyin:", "1234");
     if (!password) return;
-
     try {
-        await window.addDoc(window.collection(window.db, "users"), {
-            name: name.trim(),
-            role: role,
-            password: password
-        });
-        showToast('Yeni personel eklendi.', 'person_add');
+        await window.addDoc(window.collection(window.db, "users"), { name: name.trim(), role, password });
+        showToast('Personel eklendi.', 'person_add');
         renderSystemUsers();
-        fetchUsers(); // Refresh the global state
-    } catch (e) {
-        console.error("User add error", e);
-        showToast('Kullanıcı eklenemedi.', 'error');
-    }
-}
-
-window.promptDeleteUser = async function () {
-    const name = prompt("Silmek istediğiniz personelin tam adını yazın:\\n(UYARI: Bu işlem geri alınamaz)");
-    if (!name || name.trim() === '') return;
-
-    // Find the user ID
-    const userToDelete = systemUsers.find(u => u.name.toLowerCase() === name.trim().toLowerCase());
-
-    if (userToDelete) {
-        if (confirm(`${userToDelete.name} sistemden tamamen silinecek. Onaylıyor musunuz?`)) {
-            try {
-                await window.deleteDoc(window.doc(window.db, "users", userToDelete.id));
-                showToast('Personel sistemden silindi.', 'person_remove');
-                renderSystemUsers();
-                fetchUsers(); // Refresh global state
-            } catch (e) {
-                console.error("User delete error", e);
-                showToast('Silinirken hata oluştu.', 'error');
-            }
-        }
-    } else {
-        showToast('Bu isimde bir personel bulunamadı.', 'error');
-    }
-}
+    } catch (e) { showToast('Eklenemedi.', 'error'); }
+};
 
 window.promptEditPassword = async function (userId, userName) {
-    const newPassword = prompt(`${userName} kullanıcısı için yeni şifre belirleyin:`);
-    if (newPassword && newPassword.trim() !== '') {
+    const pw = prompt(`${userName} için yeni şifre:`);
+    if (pw && pw.trim()) {
         try {
-            await window.updateDoc(window.doc(window.db, "users", userId), {
-                password: newPassword.trim()
-            });
-            showToast('Şifre başarıyla güncellendi.', 'vpn_key');
+            await window.updateDoc(window.doc(window.db, "users", userId), { password: pw.trim() });
+            showToast('Şifre güncellendi.', 'vpn_key');
             renderSystemUsers();
-            fetchUsers();
-        } catch (e) {
-            console.error("Password update error", e);
-            showToast('Şifre güncellenirken hata oluştu.', 'error');
-        }
+        } catch (e) { showToast('Güncellenemedi.', 'error'); }
     }
+};
+
+window.promptDeleteUser = async function () {
+    const name = prompt("Silmek istediğiniz personelin tam adını girin:");
+    if (!name || !name.trim()) return;
+    const user = systemUsers.find(u => u.name.toLowerCase() === name.trim().toLowerCase());
+    if (user) {
+        if (confirm(`${user.name} silinecek. Onaylıyor musunuz?`)) {
+            try {
+                await window.deleteDoc(window.doc(window.db, "users", user.id));
+                showToast('Personel silindi.', 'person_remove');
+                renderSystemUsers();
+            } catch (e) { showToast('Silinemedi.', 'error'); }
+        }
+    } else { showToast('Personel bulunamadı.', 'search_off'); }
+};
+
+// ─── TOAST ──────────────────────────────────────────────────
+
+function showToast(message, icon) {
+    if (!toastContainer) return;
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.innerHTML = `<span class="material-icons-round">${icon || 'info'}</span>${message}`;
+    toastContainer.appendChild(t);
+    setTimeout(() => { t.style.animation = 'toastLeave 0.3s forwards'; setTimeout(() => t.remove(), 300); }, 3000);
 }
 
-// ================================
-//  RADIO PLAYER FUNCTIONS
-// ================================
+// ─── RADIO ──────────────────────────────────────────────────
 
 window.toggleHeaderRadio = function () {
     const panel = document.getElementById('header-radio-panel');
     const btns = document.querySelectorAll('.radio-toggle-btn');
     if (!panel) return;
     panel.classList.toggle('open');
-    const isOpen = panel.classList.contains('open');
-    btns.forEach(btn => btn.classList.toggle('active', isOpen));
-}
+    const open = panel.classList.contains('open');
+    btns.forEach(b => b.classList.toggle('active', open));
+};
 
 window.playRadio = function () {
-    const station = document.getElementById('radio-station');
+    const sel = document.getElementById('radio-station');
     const audio = document.getElementById('radio-audio-player');
-    const statusEl = document.getElementById('yt-status-text');
-    const playIcon = document.getElementById('yt-play-icon');
-    if (!audio || !station) return;
-    audio.src = station.value;
-    audio.play()
-        .then(() => {
-            if (statusEl) statusEl.textContent = '▶ Yayın dinleniyor...';
-            if (playIcon) playIcon.textContent = 'pause';
-        })
-        .catch(err => {
-            console.error('Radio error:', err);
-            if (statusEl) statusEl.textContent = '⚠ Yayın başlatılamadı.';
+    const stat = document.getElementById('yt-status-text');
+    const icon = document.getElementById('yt-play-icon');
+    if (!audio || !sel) return;
+    if (audio.src !== sel.value) audio.src = sel.value;
+    if (audio.paused) {
+        if (stat) stat.textContent = 'Bağlanıyor...';
+        if (icon) icon.textContent = 'hourglass_empty';
+        audio.play().then(() => {
+            if (stat) stat.textContent = sel.options[sel.selectedIndex].text + ' Devrede';
+            if (icon) icon.textContent = 'pause';
+            if ('mediaSession' in navigator) {
+                navigator.mediaSession.metadata = new MediaMetadata({ title: sel.options[sel.selectedIndex].text, artist: 'Canlı Radyo' });
+                navigator.mediaSession.setActionHandler('play', window.playRadio);
+                navigator.mediaSession.setActionHandler('pause', window.stopRadio);
+            }
+        }).catch(() => {
+            if (stat) stat.textContent = 'Bağlantı hatası!';
+            if (icon) icon.textContent = 'play_arrow';
         });
-
-    if ('mediaSession' in navigator) {
-        navigator.mediaSession.metadata = new MediaMetadata({
-            title: station.options[station.selectedIndex].text,
-            artist: 'Canlı Radyo',
-        });
+    } else {
+        audio.pause();
+        if (stat) stat.textContent = 'Duraklatıldı.';
+        if (icon) icon.textContent = 'play_arrow';
     }
-}
+};
 
 window.stopRadio = function () {
     const audio = document.getElementById('radio-audio-player');
-    const statusEl = document.getElementById('yt-status-text');
-    const playIcon = document.getElementById('yt-play-icon');
+    const stat = document.getElementById('yt-status-text');
+    const icon = document.getElementById('yt-play-icon');
     if (!audio) return;
-    audio.pause();
-    audio.src = '';
-    if (statusEl) statusEl.textContent = 'Radyo kapalı.';
-    if (playIcon) playIcon.textContent = 'play_arrow';
-}
+    audio.pause(); audio.src = '';
+    if (stat) stat.textContent = 'Radyo kapalı.';
+    if (icon) icon.textContent = 'play_arrow';
+};
 
 window.changeRadioVolume = function (val) {
     const audio = document.getElementById('radio-audio-player');
     if (audio) audio.volume = val / 100;
-}
+};
