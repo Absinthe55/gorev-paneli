@@ -627,3 +627,9 @@ window.changeYtVolume = function (val) {
         ytPlayer.setVolume(val);
     }
 };
+
+// Dynamically load the YouTube IFrame API to ensure our callback is ready
+const tag = document.createElement('script');
+tag.src = "https://www.youtube.com/iframe_api";
+const firstScriptTag = document.getElementsByTagName('script')[0];
+firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
