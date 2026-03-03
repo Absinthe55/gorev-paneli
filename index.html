@@ -28,22 +28,32 @@
                 <p>Hidrolik Birimi Görev Yönetimi</p>
             </div>
 
-            <form id="login-form">
-                <div class="input-group">
-                    <span class="material-icons-round">person</span>
-                    <select id="username" required>
-                        <option value="" disabled selected>Giriş Yapılacak Kişi</option>
-                        <option value="Erkan Çilingir">Erkan Çilingir (Amir)</option>
-                        <option value="Berat Özker">Berat Özker (Usta)</option>
-                    </select>
+            <div class="login-options">
+                <!-- Amir Card -->
+                <div class="login-card-user" onclick="window.login('Erkan Çilingir', 'supervisor')">
+                    <div class="user-avatar amir">
+                        <span class="material-icons-round">admin_panel_settings</span>
+                    </div>
+                    <div class="user-info">
+                        <h3>Erkan Çilingir</h3>
+                        <p>Amir (Yönetici)</p>
+                    </div>
+                    <span class="material-icons-round arrow">chevron_right</span>
                 </div>
 
-                <button type="submit" class="btn primary-btn pulse-effect">
-                    Giriş Yap
-                    <span class="material-icons-round">arrow_forward</span>
-                </button>
-            </form>
-            <div class="hint">Sistemi test etmek için isminizi seçerek giriş yapın.</div>
+                <!-- Worker Card -->
+                <div class="login-card-user" onclick="window.login('Berat Özker', 'worker')">
+                    <div class="user-avatar usta">
+                        <span class="material-icons-round">engineering</span>
+                    </div>
+                    <div class="user-info">
+                        <h3>Berat Özker</h3>
+                        <p>Hidrolik Ustası</p>
+                    </div>
+                    <span class="material-icons-round arrow">chevron_right</span>
+                </div>
+            </div>
+            <div class="hint">Sisteme giriş yapmak için profilinizi seçin.</div>
         </div>
     </main>
 
@@ -107,6 +117,14 @@
                     <!-- Görevler buraya JavaScript ile eklenecek -->
                 </div>
             </section>
+
+            <section class="leave-list-section glass-panel" style="margin-top: 1rem;">
+                <h3><span class="material-icons-round" style="vertical-align: middle;">event_note</span> İzin Talepleri
+                    & Takvim</h3>
+                <div class="task-container" id="supervisor-leaves">
+                    <!-- İzinler buraya eklenecek -->
+                </div>
+            </section>
         </div>
     </main>
 
@@ -130,6 +148,32 @@
                 <div class="task-container" id="worker-tasks">
                     <!-- Usta görevleri buraya eklenecek -->
                 </div>
+            </section>
+
+            <section class="leave-request-section glass-panel">
+                <h3><span class="material-icons-round" style="vertical-align: middle;">flight_takeoff</span> Yıllık İzin
+                    Talep Et</h3>
+                <form id="leave-form">
+                    <div class="input-group dark" style="margin-bottom: 0.5rem;">
+                        <span class="material-icons-round">calendar_today</span>
+                        <input type="date" id="leave-start" required title="Başlangıç Tarihi">
+                    </div>
+                    <div
+                        style="color: var(--clr-text-muted); font-size: 0.8rem; margin-bottom: 0.5rem; padding-left: 1rem;">
+                        Başlangıç Tarihi</div>
+
+                    <div class="input-group dark" style="margin-bottom: 0.5rem;">
+                        <span class="material-icons-round">event_busy</span>
+                        <input type="date" id="leave-end" required title="Bitiş Tarihi">
+                    </div>
+                    <div
+                        style="color: var(--clr-text-muted); font-size: 0.8rem; margin-bottom: 1rem; padding-left: 1rem;">
+                        Bitiş Tarihi</div>
+
+                    <button type="submit" class="btn secondary-btn" id="submit-leave-btn">
+                        <span class="material-icons-round">send</span> İzin Talebi Gönder
+                    </button>
+                </form>
             </section>
         </div>
     </main>
@@ -177,7 +221,7 @@
     <!-- Firebase SDK Kurulumu (CDN üzerinden) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, updateDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, updateDoc, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCw5SWA0IphZg1DcvpwuybwGaPabs3ewfc",
@@ -201,6 +245,7 @@
         window.orderBy = orderBy;
         window.updateDoc = updateDoc;
         window.doc = doc;
+        window.deleteDoc = deleteDoc;
     </script>
     <script src="app.js"></script>
 </body>

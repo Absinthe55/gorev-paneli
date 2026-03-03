@@ -2,7 +2,9 @@
 let currentUser = null;
 let currentRole = null;
 let tasks = [];
+let leaves = [];
 let unsubscribe = null; // To hold the Firestore listener
+let leavesUnsubscribe = null;
 // DOM Elements
 const screens = {
     login: document.getElementById('login-screen'),
@@ -10,8 +12,8 @@ const screens = {
     worker: document.getElementById('worker-screen')
 };
 
-const loginForm = document.getElementById('login-form');
 const addTaskForm = document.getElementById('add-task-form');
+const leaveForm = document.getElementById('leave-form');
 const supervisorTasks = document.getElementById('supervisor-tasks');
 const workerTasks = document.getElementById('worker-tasks');
 const logoutBtns = document.querySelectorAll('.logout-btn');
@@ -23,16 +25,6 @@ const submitTaskBtn = document.getElementById('submit-task-btn');
 
 // Event Listeners
 document.addEventListener('DOMContentLoaded', init);
-
-loginForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const usernameInput = document.getElementById('username').value;
-
-    if (usernameInput) {
-        const selectedRole = usernameInput === 'Erkan Çilingir' ? 'supervisor' : 'worker';
-        login(usernameInput, selectedRole);
-    }
-});
 
 addTaskForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -109,6 +101,7 @@ function login(username, role, showToastData = true) {
     }
 
     listenForTasks();
+    listenForLeaves();
 }
 
 function logout() {
@@ -121,6 +114,10 @@ function logout() {
     if (unsubscribe) {
         unsubscribe();
         unsubscribe = null;
+    }
+    if (leavesUnsubscribe) {
+        leavesUnsubscribe();
+        leavesUnsubscribe = null;
     }
 }
 
@@ -249,6 +246,21 @@ function updateStats() {
     document.getElementById('sup-completed-count').textContent = `${counts.completed} Biten`;
 }
 
+function listenForLeaves() {
+    if (leavesUnsubscribe) leavesUnsubscribe();
+    const q = window.query(window.collection(window.db, "leaves"), window.orderBy("timestamp", "desc"));
+    leavesUnsubscribe = window.onSnapshot(q, (querySnapshot) => {
+        leaves = [];
+        querySnapshot.forEach((doc) => {
+            leaves.push({ id: doc.id, ...doc.data() });
+        });
+
+        if (currentRole === 'supervisor') {
+            renderSupervisorLeaves();
+        }
+    });
+}
+
 function renderSupervisorTasks() {
     supervisorTasks.innerHTML = '';
 
@@ -284,6 +296,32 @@ function renderSupervisorTasks() {
             </div>`;
         }
 
+        let seenHtml = '';
+        if (task.seenAt) {
+            const seenTime = new Date(task.seenAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+            seenHtml = `
+            <div class="meta-item" title="Görüldü Zamanı" style="color: #60a5fa;">
+                <span class="material-icons-round" style="font-size: 1rem;">done_all</span>
+                ${seenTime}
+            </div>`;
+        } else {
+            seenHtml = `
+            <div class="meta-item" title="İletildi, henüz bakılmadı" style="opacity: 0.5;">
+                <span class="material-icons-round" style="font-size: 1rem;">check</span>
+                İletildi
+            </div>`;
+        }
+
+        let materialHtml = '';
+        if (task.materialRequest) {
+            materialHtml = `
+                <div style="margin-top:0.5rem; padding: 0.75rem; background: rgba(245, 158, 11, 0.1); border-left: 3px solid #f59e0b; font-size: 0.85rem; color: #fcd34d; border-radius: 0 4px 4px 0;">
+                    <span class="material-icons-round" style="font-size: 1rem; vertical-align: middle; margin-right: 0.3rem;">warning</span>
+                    <strong>Eksik Malzeme İsteniyor:</strong> ${task.materialRequest}
+                </div>
+            `;
+        }
+
         const html = `
             <div class="task-card ${priorityClass} ${statusClass}">
                 <div class="task-header">
@@ -299,8 +337,15 @@ function renderSupervisorTasks() {
                         <span class="material-icons-round">${statusIcon}</span>
                         ${statusText}
                     </div>
+                    ${seenHtml}
                 </div>
                 ${imageHtml}
+                ${materialHtml}
+                <div class="task-actions">
+                    <button class="action-btn" style="background: rgba(239, 68, 68, 0.1); color: var(--clr-status-urgent); border: 1px solid rgba(239, 68, 68, 0.3);" onclick="deleteTask('${task.id}')">
+                        <span class="material-icons-round">delete_outline</span> Sil
+                    </button>
+                </div>
             </div>
         `;
         supervisorTasks.insertAdjacentHTML('beforeend', html);
@@ -310,10 +355,8 @@ function renderSupervisorTasks() {
 function renderWorkerTasks() {
     workerTasks.innerHTML = '';
 
-    // MOCK: In a real app, filter for this specific worker. 
-    // Here we show all just so the user can see them during testing,
-    // or we filter by the name they entered. Let's filter by name loosely.
-    const myTasks = tasks.map(t => t); // For demo, show all tasks but we can filter later
+    // Filter tasks only for the currently logged in worker
+    const myTasks = tasks.filter(t => t.worker === currentUser);
 
     if (myTasks.length === 0) {
         workerTasks.innerHTML = '<div class="hint">Size atanmış görev bulunmuyor.</div>';
@@ -321,6 +364,11 @@ function renderWorkerTasks() {
     }
 
     myTasks.forEach(task => {
+        // Log "seen" receipt if not already recorded
+        if (!task.seenAt && task.status === 'pending') {
+            markTaskAsSeen(task.id);
+        }
+
         const priorityClass = task.priority === 'high' ? 'priority-high' : '';
         const statusClass = `status-${task.status}`;
 
@@ -375,6 +423,23 @@ function renderWorkerTasks() {
             `;
         }
 
+        let materialHtml = '';
+        if (task.materialRequest) {
+            materialHtml = `
+                <div style="margin-top:0.5rem; padding: 0.75rem; background: rgba(245, 158, 11, 0.1); border-left: 3px solid #f59e0b; font-size: 0.85rem; color: #fcd34d; border-radius: 0 4px 4px 0;">
+                    <strong>Malzeme Talebiniz:</strong> ${task.materialRequest}
+                </div>
+            `;
+        } else if (task.status !== 'completed') {
+            materialHtml = `
+                <div style="margin-top: 0.5rem;">
+                    <button class="action-btn" style="background: rgba(245, 158, 11, 0.1); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.3); padding: 0.5rem; font-size: 0.8rem; height: auto;" onclick="requestMaterial('${task.id}')">
+                        <span class="material-icons-round" style="font-size: 1rem;">build_circle</span> Eksik Malzeme İste
+                    </button>
+                </div>
+            `;
+        }
+
         const html = `
             <div class="task-card ${priorityClass} ${statusClass}">
                 <div class="task-header">
@@ -392,10 +457,145 @@ function renderWorkerTasks() {
                         ${statusText}
                     </div>
                 </div>
+                ${materialHtml}
                 ${actionsHtml}
             </div>
         `;
         workerTasks.insertAdjacentHTML('beforeend', html);
+    });
+}
+
+async function markTaskAsSeen(taskId) {
+    try {
+        const taskRef = window.doc(window.db, "tasks", taskId);
+        await window.updateDoc(taskRef, {
+            seenAt: new Date().toISOString()
+        });
+    } catch (e) {
+        console.error("Seen receipt could not be sent", e);
+    }
+}
+
+window.deleteTask = async function (taskId) {
+    if (confirm("Bu görevi geri dönüşümsüz olarak silmek istediğinize emin misiniz?")) {
+        try {
+            await window.deleteDoc(window.doc(window.db, "tasks", taskId));
+            showToast('Görev başarıyla silindi', 'delete');
+        } catch (e) {
+            console.error("Error deleting document: ", e);
+            showToast('Görev silinirken hata oluştu', 'error');
+        }
+    }
+}
+
+window.requestMaterial = async function (taskId) {
+    const item = prompt("Hangi malzeme eksik?");
+    if (item && item.trim() !== '') {
+        try {
+            const taskRef = window.doc(window.db, "tasks", taskId);
+            await window.updateDoc(taskRef, {
+                materialRequest: item.trim()
+            });
+            showToast('Malzeme talebi amire iletildi.', 'shopping_cart_checkout');
+        } catch (e) {
+            console.error("Material req error: ", e);
+            showToast('Talep gönderilemedi.', 'error');
+        }
+    }
+}
+
+// Yıllık İzin İşlemleri
+if (leaveForm) {
+    leaveForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const Btn = document.getElementById('submit-leave-btn');
+        const start = document.getElementById('leave-start').value;
+        const end = document.getElementById('leave-end').value;
+
+        if (start && end) {
+            Btn.disabled = true;
+            Btn.innerHTML = '<span class="material-icons-round">hourglass_empty</span> Gönderiliyor...';
+
+            const newLeave = {
+                worker: currentUser,
+                start: start,
+                end: end,
+                status: 'pending',
+                timestamp: new Date().toISOString()
+            };
+
+            try {
+                await window.addDoc(window.collection(window.db, "leaves"), newLeave);
+                showToast('İzin talebi gönderildi.', 'event_available');
+                leaveForm.reset();
+            } catch (error) {
+                console.error("Leave error: ", error);
+                showToast('İzin talebi gönderilemedi.', 'error');
+            }
+
+            Btn.disabled = false;
+            Btn.innerHTML = '<span class="material-icons-round">send</span> İzin Talebi Gönder';
+        }
+    });
+}
+
+window.updateLeaveStatus = async function (leaveId, status) {
+    try {
+        await window.updateDoc(window.doc(window.db, "leaves", leaveId), { status });
+        showToast('İzin durumu güncellendi', 'update');
+    } catch (e) {
+        console.error(e);
+        showToast('Durum güncellenemedi', 'error');
+    }
+}
+
+function renderSupervisorLeaves() {
+    const list = document.getElementById('supervisor-leaves');
+    if (!list) return;
+    list.innerHTML = '';
+
+    if (leaves.length === 0) {
+        list.innerHTML = '<div class="hint">Bekleyen veya onaylanmış izin talebi yok.</div>';
+        return;
+    }
+
+    leaves.forEach(lv => {
+        let statusBadge = '';
+        let actions = '';
+
+        // Format dates
+        const startDate = new Date(lv.start).toLocaleDateString('tr-TR');
+        const endDate = new Date(lv.end).toLocaleDateString('tr-TR');
+
+        if (lv.status === 'pending') {
+            statusBadge = `<span style="color:var(--clr-status-pending)">Bekliyor</span>`;
+            actions = `
+                <button class="action-btn" style="background: rgba(16, 185, 129, 0.1); color: var(--clr-status-completed); border: 1px solid rgba(16, 185, 129, 0.3);" onclick="updateLeaveStatus('${lv.id}', 'approved')">
+                    <span class="material-icons-round">thumb_up</span> Onayla
+                </button>
+                <button class="action-btn" style="background: rgba(239, 68, 68, 0.1); color: var(--clr-status-urgent); border: 1px solid rgba(239, 68, 68, 0.3);" onclick="updateLeaveStatus('${lv.id}', 'rejected')">
+                    <span class="material-icons-round">thumb_down</span> Reddet
+                </button>
+            `;
+        } else if (lv.status === 'approved') {
+            statusBadge = `<span style="color:var(--clr-status-completed)">Onaylandı</span>`;
+        } else {
+            statusBadge = `<span style="color:var(--clr-status-urgent)">Reddedildi</span>`;
+        }
+
+        const html = `
+            <div class="task-card">
+                <div class="task-header">
+                    <div class="task-title" style="font-size: 1rem;"><span class="material-icons-round" style="vertical-align: text-bottom; font-size: 1.2rem;">person</span> ${lv.worker} - İzin Talebi</div>
+                </div>
+                <div class="task-meta" style="margin-top: 0.5rem;">
+                    <div class="meta-item"><span class="material-icons-round">calendar_today</span> ${startDate} - ${endDate}</div>
+                    <div class="meta-item">${statusBadge}</div>
+                </div>
+                ${actions ? `<div class="task-actions" style="margin-top:0.8rem">${actions}</div>` : ''}
+            </div>
+        `;
+        list.insertAdjacentHTML('beforeend', html);
     });
 }
 
