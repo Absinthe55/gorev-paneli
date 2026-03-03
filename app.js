@@ -445,12 +445,12 @@ function renderSupervisorTasks() {
             ? `<span class="chip chip-blue"><span class="material-icons-round">done_all</span> ${new Date(task.seenAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span>`
             : `<span class="chip chip-muted"><span class="material-icons-round">check</span> İletildi</span>`;
 
-        const imageHtml = task.imageUrl ? `<div class="task-img-wrap"><img src="${task.imageUrl}" loading="lazy"></div>` : '';
-        const compImgHtml = task.completedImageUrl ? `<div class="task-img-wrap completed-img"><div class="img-label"><span class="material-icons-round">done_all</span> Tamamlandı</div><img src="${task.completedImageUrl}" loading="lazy"></div>` : '';
-        const matHtml = task.materialRequest ? `<div class="material-alert"><span class="material-icons-round">warning_amber</span> <strong>Eksik Malzeme:</strong> ${task.materialRequest}</div>` : '';
+        const imageHtml = task.imageUrl ? `<div class="task-img-wrap"><img src="${task.imageUrl}" loading="lazy" onclick="openImageModal('${task.imageUrl}', event)"></div>` : '';
+        const compImgHtml = task.completedImageUrl ? `<div class="task-img-wrap completed-img"><div class="img-label"><span class="material-icons-round">done_all</span> Tamamlandı</div><img src="${task.completedImageUrl}" loading="lazy" onclick="openImageModal('${task.completedImageUrl}', event)"></div>` : '';
+        const matHtml = task.materialRequest ? `<div class="material-alert" onclick="event.stopPropagation()"><span class="material-icons-round">warning_amber</span> <strong>Eksik Malzeme:</strong> ${task.materialRequest}</div>` : '';
 
         supervisorTasks.insertAdjacentHTML('beforeend', `
-            <div class="task-card priority-${task.priority}">
+            <div class="task-card priority-${task.priority}" onclick="toggleTaskCard(this, event)">
                 <div class="task-header">
                     <div class="task-title">${task.title}</div>
                     <div class="task-time">${time}</div>
@@ -461,7 +461,7 @@ function renderSupervisorTasks() {
                     ${seenHtml}
                 </div>
                 ${imageHtml}${compImgHtml}${matHtml}
-                <div class="task-actions">
+                <div class="task-actions" onclick="event.stopPropagation()">
                     <button class="action-btn danger" onclick="window.deleteTask('${task.id}')">
                         <span class="material-icons-round">delete</span> Sil
                     </button>
@@ -492,12 +492,12 @@ function renderWorkerTasks() {
         };
         const s = statusMap[task.status] || statusMap.pending;
         const time = new Date(task.timestamp).toLocaleString('tr-TR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' });
-        const imageHtml = task.imageUrl ? `<div class="task-img-wrap"><img src="${task.imageUrl}" loading="lazy"></div>` : '';
-        const compImgHtml = task.completedImageUrl ? `<div class="task-img-wrap completed-img"><div class="img-label"><span class="material-icons-round">done_all</span> Tamamladığınız İşlem</div><img src="${task.completedImageUrl}" loading="lazy"></div>` : '';
+        const imageHtml = task.imageUrl ? `<div class="task-img-wrap"><img src="${task.imageUrl}" loading="lazy" onclick="openImageModal('${task.imageUrl}', event)"></div>` : '';
+        const compImgHtml = task.completedImageUrl ? `<div class="task-img-wrap completed-img"><div class="img-label"><span class="material-icons-round">done_all</span> Tamamladığınız İşlem</div><img src="${task.completedImageUrl}" loading="lazy" onclick="openImageModal('${task.completedImageUrl}', event)"></div>` : '';
 
         let actionsHtml = '';
         if (task.status === 'pending') {
-            actionsHtml = `<div class="task-actions"><button class="action-btn success" onclick="updateTaskStatus('${task.id}','progress')"><span class="material-icons-round">play_arrow</span> Başla</button></div>`;
+            actionsHtml = `<div class="task-actions" onclick="event.stopPropagation()"><button class="action-btn success" onclick="updateTaskStatus('${task.id}','progress')"><span class="material-icons-round">play_arrow</span> Başla</button></div>`;
         } else if (task.status === 'progress') {
             actionsHtml = `
                 <div class="file-upload-group" style="margin-top:.8rem">
@@ -508,7 +508,7 @@ function renderWorkerTasks() {
                     </label>
                     <img id="cp-${task.id}" class="image-preview" style="display:none;max-height:100px">
                 </div>
-                <div class="task-actions">
+                <div class="task-actions" onclick="event.stopPropagation()">
                     <button class="action-btn success" id="btn-c-${task.id}" onclick="completeTaskWithImage('${task.id}')">
                         <span class="material-icons-round">done_all</span> Tamamla
                     </button>
@@ -516,7 +516,7 @@ function renderWorkerTasks() {
         }
 
         workerTasks.insertAdjacentHTML('beforeend', `
-            <div class="task-card priority-${task.priority}">
+            <div class="task-card priority-${task.priority}" onclick="toggleTaskCard(this, event)">
                 <div class="task-header">
                     <div class="task-title">${task.title}</div>
                     <div class="task-time">${time}</div>
@@ -573,6 +573,28 @@ window.completeTaskWithImage = async function (taskId) {
         await window.updateDoc(window.doc(window.db, "tasks", taskId), data);
         showToast('Görev tamamlandı!', 'done_all');
     } catch (e) { showToast('Durum güncellenemedi!', 'error'); if (btn) { btn.disabled = false; } }
+};
+
+window.toggleTaskCard = function (card, event) {
+    if (event.target.tagName.toLowerCase() === 'button' || event.target.closest('button')) {
+        return;
+    }
+    card.classList.toggle('expanded');
+};
+
+window.openImageModal = function (url, event) {
+    if (event) event.stopPropagation();
+    const modal = document.getElementById('image-modal');
+    const img = document.getElementById('image-modal-img');
+    if (modal && img) {
+        img.src = url;
+        modal.classList.add('active');
+    }
+};
+
+window.closeImageModal = function () {
+    const modal = document.getElementById('image-modal');
+    if (modal) modal.classList.remove('active');
 };
 
 // ─── LEAVE FUNCTIONS ────────────────────────────────────────
@@ -871,13 +893,13 @@ window.toggleHeaderRadio = function (event) {
 };
 
 // Dinamo: Ekranın başka bir yerine tıklandığında radyo panelini kapat
-document.addEventListener('click', function(event) {
+document.addEventListener('click', function (event) {
     const panel = document.getElementById('header-radio-panel');
     if (panel && panel.classList.contains('open')) {
         // Tıklanan yer panelin içi mi veya toggle butonu mu kontrol et
         const isClickInsidePanel = panel.contains(event.target);
         const isClickOnToggleBtn = event.target.closest('.radio-toggle-btn');
-        
+
         if (!isClickInsidePanel && !isClickOnToggleBtn) {
             panel.classList.remove('open');
             const btns = document.querySelectorAll('.radio-toggle-btn');

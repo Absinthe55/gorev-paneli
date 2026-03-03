@@ -867,6 +867,77 @@ input[type="date"] {
     flex-shrink: 0;
 }
 
+/* ── EXPANDABLE TASK CARDS ───────────────────────────── */
+.task-card .task-img-wrap,
+.task-card .task-actions,
+.task-card .material-alert {
+    display: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.task-card.expanded .task-img-wrap,
+.task-card.expanded .task-actions,
+.task-card.expanded .material-alert {
+    display: block;
+    opacity: 1;
+    animation: fadeIn 0.3s ease forwards;
+}
+
+/* ── IMAGE MODAL ─────────────────────────────────────── */
+.image-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    z-index: 2000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.image-modal.active {
+    display: flex;
+    opacity: 1;
+}
+
+.image-modal img {
+    max-width: 90%;
+    max-height: 85%;
+    border-radius: var(--r-md);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+    transform: scale(0.9);
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.image-modal.active img {
+    transform: scale(1);
+}
+
+.image-modal-close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.image-modal-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
 /* ── CHIPS ───────────────────────────────────────────── */
 .task-chips {
     display: flex;
