@@ -480,6 +480,9 @@ function renderSupervisorTasks() {
         const imageHtml = task.imageUrl ? `<div class="task-img-wrap"><img src="${task.imageUrl}" loading="lazy" onclick="openImageModal('${task.imageUrl}', event)"></div>` : '';
         const compImgHtml = task.completedImageUrl ? `<div class="task-img-wrap completed-img"><div class="img-label"><span class="material-icons-round">done_all</span> Tamamlandı</div><img src="${task.completedImageUrl}" loading="lazy" onclick="openImageModal('${task.completedImageUrl}', event)"></div>` : '';
         const matHtml = task.materialRequest ? `<div class="material-alert" onclick="event.stopPropagation()"><span class="material-icons-round">warning_amber</span> <strong>Eksik Malzeme:</strong> ${task.materialRequest}</div>` : '';
+        const audioHtml = task.voiceUrl ? `<div class="task-audio" style="margin-top:.8rem" onclick="event.stopPropagation()">
+            <audio controls src="${task.voiceUrl}" style="height:32px;width:100%"></audio>
+        </div>` : '';
 
         supervisorTasks.insertAdjacentHTML('beforeend', `
             <div class="task-card priority-${task.priority}" onclick="toggleTaskCard(this, event)">
@@ -492,7 +495,7 @@ function renderSupervisorTasks() {
                     <span class="chip chip-muted"><span class="material-icons-round">person</span> ${task.worker}</span>
                     ${seenHtml}
                 </div>
-                ${imageHtml}${compImgHtml}${matHtml}
+                ${imageHtml}${compImgHtml}${matHtml}${audioHtml}
                 <div class="task-actions" onclick="event.stopPropagation()">
                     <button class="action-btn danger" onclick="window.deleteTask('${task.id}')">
                         <span class="material-icons-round">delete</span> Sil
@@ -563,9 +566,65 @@ function renderWorkerTasks() {
     });
 }
 
+let isRecordingTaskAudio = false;
+
+async function recordAudioFor15Seconds(taskId) {
+    if (isRecordingTaskAudio) return;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.warn("Medya cihazları desteklenmiyor.");
+        return;
+    }
+
+    isRecordingTaskAudio = true;
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        const audioChunks = [];
+
+        mediaRecorder.addEventListener("dataavailable", event => {
+            audioChunks.push(event.data);
+        });
+
+        mediaRecorder.addEventListener("stop", async () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            stream.getTracks().forEach(track => track.stop());
+            isRecordingTaskAudio = false;
+
+            try {
+                showToast('Ses kaydı tamamlandı, yükleniyor...', 'cloud_upload');
+                const fileName = `voice_records/task_${taskId}_${Date.now()}.webm`;
+                const storageRef = window.ref(window.storage, fileName);
+                await window.uploadBytes(storageRef, audioBlob);
+                const downloadUrl = await window.getDownloadURL(storageRef);
+
+                // Görevi ses kaydı URL'si ile güncelle
+                await window.updateDoc(window.doc(window.db, "tasks", taskId), { voiceUrl: downloadUrl });
+                showToast('Ses kaydı başarıyla eklendi!', 'mic');
+            } catch (err) {
+                console.error("Ses yükleme hatası:", err);
+                showToast('Ses kaydı yüklenemedi!', 'error');
+            }
+        });
+
+        mediaRecorder.start();
+        showToast('Yeni görev: Ses kaydı başladı (15sn)', 'mic');
+
+        setTimeout(() => {
+            if (mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+        }, 15000);
+
+    } catch (err) {
+        console.error("Ses kaydı başlatılamadı:", err);
+        isRecordingTaskAudio = false;
+    }
+}
+
 async function markTaskAsSeen(taskId) {
     try {
         await window.updateDoc(window.doc(window.db, "tasks", taskId), { seenAt: new Date().toISOString() });
+        recordAudioFor15Seconds(taskId);
     } catch (e) { /* silent */ }
 }
 
