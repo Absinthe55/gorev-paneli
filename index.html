@@ -303,7 +303,8 @@
         </nav>
     </main>
 
-    <!-- Firebase SDK -->
+    <!-- Firebase SDK: sets window.db before calling app init -->
+    <script src="app.js"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, query, orderBy, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -320,6 +321,7 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
+        // Expose Firebase API to app.js
         window.db = db;
         window.collection = collection;
         window.addDoc = addDoc;
@@ -330,9 +332,11 @@
         window.orderBy = orderBy;
         window.getDocs = getDocs;
         window.deleteDoc = deleteDoc;
-    </script>
 
-    <script src="app.js" defer></script>
+        // Firebase is ready — now bootstrap the app
+        window.firebaseReady = true;
+        if (typeof window.appInit === 'function') window.appInit();
+    </script>
 </body>
 
 </html>

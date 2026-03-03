@@ -1,5 +1,7 @@
 // ============================================================
 //  TITAN MAKİNA - GÖREV YÖNETİM SİSTEMİ  |  app.js
+//  Firebase is initialized BEFORE this file runs; window.db is
+//  guaranteed to be available when window.appInit() is called.
 // ============================================================
 
 let currentUser = null;
@@ -36,7 +38,8 @@ const fileNameDisplay = document.getElementById('file-name-display');
 const imagePreview = document.getElementById('image-preview');
 const submitTaskBtn = document.getElementById('submit-task-btn');
 
-document.addEventListener('DOMContentLoaded', init);
+// Called by the Firebase module script after window.db is ready
+window.appInit = function () { init(); };
 
 // ─── LOGIN ──────────────────────────────────────────────────
 
