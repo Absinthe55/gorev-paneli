@@ -857,7 +857,11 @@ function showToast(message, icon) {
 
 // ─── RADIO ──────────────────────────────────────────────────
 
-window.toggleHeaderRadio = function () {
+window.toggleHeaderRadio = function (event) {
+    // If the click came from a button, prevent it from bubbling up to the document
+    if (event) {
+        event.stopPropagation();
+    }
     const panel = document.getElementById('header-radio-panel');
     const btns = document.querySelectorAll('.radio-toggle-btn');
     if (!panel) return;
@@ -865,6 +869,22 @@ window.toggleHeaderRadio = function () {
     const open = panel.classList.contains('open');
     btns.forEach(b => b.classList.toggle('active', open));
 };
+
+// Dinamo: Ekranın başka bir yerine tıklandığında radyo panelini kapat
+document.addEventListener('click', function(event) {
+    const panel = document.getElementById('header-radio-panel');
+    if (panel && panel.classList.contains('open')) {
+        // Tıklanan yer panelin içi mi veya toggle butonu mu kontrol et
+        const isClickInsidePanel = panel.contains(event.target);
+        const isClickOnToggleBtn = event.target.closest('.radio-toggle-btn');
+        
+        if (!isClickInsidePanel && !isClickOnToggleBtn) {
+            panel.classList.remove('open');
+            const btns = document.querySelectorAll('.radio-toggle-btn');
+            btns.forEach(b => b.classList.remove('active'));
+        }
+    }
+});
 
 window.playRadio = function () {
     const sel = document.getElementById('radio-station');

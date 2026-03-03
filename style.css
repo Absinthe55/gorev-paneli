@@ -249,20 +249,26 @@ body {
 
 /* ── RADIO PANEL ─────────────────────────────────────── */
 .header-radio-panel {
-    display: none;
+    display: flex;
     flex-direction: column;
     gap: .7rem;
-    padding: .9rem 1.1rem;
+    padding: 0 1.1rem;
     background: rgba(6, 10, 22, 0.95);
-    border-bottom: 1px solid rgba(59, 130, 246, .2);
+    border-bottom: 0px solid rgba(59, 130, 246, .2);
     flex-shrink: 0;
     position: relative;
     z-index: 100;
-    animation: fadeIn .2s ease;
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease, border-bottom 0.3s ease;
 }
 
 .header-radio-panel.open {
-    display: flex;
+    max-height: 300px;
+    opacity: 1;
+    padding: .9rem 1.1rem;
+    border-bottom: 1px solid rgba(59, 130, 246, .2);
 }
 
 .radio-inline-controls {
