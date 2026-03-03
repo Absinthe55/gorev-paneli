@@ -704,14 +704,16 @@ function renderSupervisorMaterials() {
     materials.forEach(m => {
         const statusMap = {
             pending: { cls: 'pending', label: 'Bekliyor' },
-            resolved: { cls: 'completed', label: 'Çözüldü' }
+            resolved: { cls: 'completed', label: 'Çözüldü' }, // Eski kayıtlar için
+            approved: { cls: 'completed', label: 'Onaylandı' },
+            rejected: { cls: 'danger', label: 'Reddedildi' }
         };
         const st = statusMap[m.status] || statusMap.pending;
         const commentsHtml = (m.comments || []).map(c =>
             `<div class="comment ${c.role}"><strong>${c.author}:</strong> ${c.text}</div>`
         ).join('');
         list.insertAdjacentHTML('beforeend', `
-            <div class="task-card">
+            <div class="task-card" onclick="window.toggleTaskCard(this, event)">
                 <div class="task-header">
                     <div class="task-title"><span class="material-icons-round" style="font-size:1rem;vertical-align:middle">inventory_2</span> ${m.name}</div>
                 </div>
@@ -721,12 +723,15 @@ function renderSupervisorMaterials() {
                 </div>
                 ${m.desc ? `<p class="mat-desc">${m.desc}</p>` : ''}
                 <div class="comments-section">${commentsHtml}</div>
-                <div class="comment-form">
+                <div class="comment-form" onclick="event.stopPropagation()">
                     <input type="text" class="comment-input" id="mc-${m.id}" placeholder="Yorum ekle...">
                     <button class="action-btn" onclick="window.addComment('${m.id}')"><span class="material-icons-round">send</span></button>
                 </div>
-                <div class="task-actions" style="margin-top:.5rem">
-                    ${m.status === 'pending' ? `<button class="action-btn success" onclick="window.resolveMaterial('${m.id}')"><span class="material-icons-round">check_circle</span> Çözüldü</button>` : ''}
+                <div class="task-actions" style="margin-top:.5rem" onclick="event.stopPropagation()">
+                    ${m.status === 'pending' ? `
+                    <button class="action-btn success" onclick="window.updateMaterialStatus('${m.id}', 'approved')"><span class="material-icons-round">check_circle</span> Onayla</button>
+                    <button class="action-btn danger" onclick="window.updateMaterialStatus('${m.id}', 'rejected')"><span class="material-icons-round">cancel</span> Reddet</button>
+                    ` : ''}
                     <button class="action-btn danger" onclick="window.deleteMaterial('${m.id}')"><span class="material-icons-round">delete</span> Sil</button>
                 </div>
             </div>
@@ -743,14 +748,16 @@ function renderWorkerMaterials() {
     myMats.forEach(m => {
         const statusMap = {
             pending: { cls: 'pending', label: 'Bekliyor' },
-            resolved: { cls: 'completed', label: 'Çözüldü' }
+            resolved: { cls: 'completed', label: 'Çözüldü' }, // Eski kayıtlar için
+            approved: { cls: 'completed', label: 'Onaylandı' },
+            rejected: { cls: 'danger', label: 'Reddedildi' }
         };
         const st = statusMap[m.status] || statusMap.pending;
         const commentsHtml = (m.comments || []).map(c =>
             `<div class="comment ${c.role}"><strong>${c.author}:</strong> ${c.text}</div>`
         ).join('');
         list.insertAdjacentHTML('beforeend', `
-            <div class="task-card">
+            <div class="task-card" onclick="window.toggleTaskCard(this, event)">
                 <div class="task-header">
                     <div class="task-title">${m.name}</div>
                 </div>
@@ -759,7 +766,7 @@ function renderWorkerMaterials() {
                 </div>
                 ${m.desc ? `<p class="mat-desc">${m.desc}</p>` : ''}
                 <div class="comments-section">${commentsHtml}</div>
-                <div class="comment-form">
+                <div class="comment-form" onclick="event.stopPropagation()">
                     <input type="text" class="comment-input" id="mc-${m.id}" placeholder="Yorum ekle...">
                     <button class="action-btn" onclick="window.addComment('${m.id}')"><span class="material-icons-round">send</span></button>
                 </div>
@@ -785,6 +792,15 @@ window.resolveMaterial = async function (materialId) {
     try {
         await window.updateDoc(window.doc(window.db, "materials", materialId), { status: 'resolved' });
         showToast('Talep çözüldü olarak işaretlendi.', 'check_circle');
+    } catch (e) { showToast('Güncellenemedi.', 'error'); }
+};
+
+window.updateMaterialStatus = async function (materialId, status) {
+    try {
+        await window.updateDoc(window.doc(window.db, "materials", materialId), { status });
+        const msgs = { 'approved': 'Talebi onayladınız.', 'rejected': 'Talebi reddettiniz.' };
+        const iconClasses = { 'approved': 'check_circle', 'rejected': 'cancel' };
+        showToast(msgs[status] || 'Durum güncellendi.', iconClasses[status] || 'info');
     } catch (e) { showToast('Güncellenemedi.', 'error'); }
 };
 
