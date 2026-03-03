@@ -479,8 +479,12 @@ function showToast(message, icon) {
 }
 
 // ==========================================
-// YOUTUBE AUDIO PLAYER LOGIC
+// YOUTUBE AUDIO PLAYER & BACKGROUND HACK LOGIC
 // ==========================================
+
+// Create a silent audio element to keep the browser awake
+const silentAudio = new Audio('silence.mp3');
+silentAudio.loop = true;
 
 // This function is automatically called by the YouTube IFrame API script when it loads
 window.onYouTubeIframeAPIReady = function () {
@@ -515,14 +519,36 @@ function onPlayerStateChange(event) {
     if (event.data == YT.PlayerState.PLAYING) {
         statusText.textContent = "Çalıyor...";
         playIcon.textContent = "pause";
+        // Start silent audio to keep tab alive
+        silentAudio.play().catch(e => console.log("Silent audio autoplay blocked, waiting for user interaction."));
+        updateMediaSession('Oynatılıyor', 'Titan Görev Paneli');
     } else if (event.data == YT.PlayerState.PAUSED) {
         statusText.textContent = "Duraklatıldı";
         playIcon.textContent = "play_arrow";
+        silentAudio.pause();
     } else if (event.data == YT.PlayerState.ENDED) {
         statusText.textContent = "Müzik Bitti";
         playIcon.textContent = "play_arrow";
+        silentAudio.pause();
     } else if (event.data == YT.PlayerState.BUFFERING) {
         statusText.textContent = "Yükleniyor...";
+    }
+}
+
+// Update the native mobile lock screen controls
+function updateMediaSession(title, artist) {
+    if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+            title: title,
+            artist: artist,
+            album: 'Arka Plan Müziği',
+            artwork: [
+                { src: 'https://cdn-icons-png.flaticon.com/512/1055/1055183.png', sizes: '512x512', type: 'image/png' }
+            ]
+        });
+
+        navigator.mediaSession.setActionHandler('play', function () { window.playYtAudio(); });
+        navigator.mediaSession.setActionHandler('pause', function () { window.stopYtAudio(); });
     }
 }
 
@@ -557,6 +583,9 @@ window.playYtAudio = function () {
         return;
     }
 
+    // User interacted, now safe to play the silent audio hack
+    silentAudio.play().catch(e => console.log(e));
+
     const urlInput = document.getElementById('yt-url-input').value.trim();
     if (!urlInput) {
         showToast("Lütfen bir YouTube linki girin!", "warning");
@@ -587,6 +616,7 @@ window.playYtAudio = function () {
 window.stopYtAudio = function () {
     if (ytPlayerReady && ytPlayer) {
         ytPlayer.stopVideo();
+        silentAudio.pause();
         document.getElementById('yt-status-text').textContent = "Durduruldu";
         document.getElementById('yt-play-icon').textContent = "play_arrow";
     }
