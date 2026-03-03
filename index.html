@@ -27,6 +27,33 @@
         <span class="material-icons-round spinning">refresh</span>
     </div>
 
+    <!-- Radio panel (Global) -->
+    <div class="header-radio-panel" id="header-radio-panel">
+        <select id="radio-station" class="radio-select">
+            <option value="https://listen.powerapp.com.tr/powerturk/mpeg/icecast.audio">🎧 PowerTürk</option>
+            <option value="https://listen.powerapp.com.tr/powerpop/mpeg/icecast.audio">🎧 Power Pop</option>
+            <option value="https://radios.trt.net.tr/trtfm">🎧 TRT FM</option>
+            <option value="https://listen.powerapp.com.tr/powerapparabesk/mpeg/icecast.audio">🎧 Power Arabesk
+            </option>
+            <option value="https://yayin.kralfm.com.tr/kralfm/mp3/icecast.audio">🎧 Kral FM</option>
+        </select>
+        <div class="radio-inline-controls">
+            <button class="btn yt-btn play" id="yt-play-btn" onclick="window.playRadio()">
+                <span class="material-icons-round" id="yt-play-icon">play_arrow</span> Dinle
+            </button>
+            <button class="btn yt-btn stop" onclick="window.stopRadio()">
+                <span class="material-icons-round">stop</span> Kapat
+            </button>
+            <div class="radio-volume">
+                <span class="material-icons-round">volume_up</span>
+                <input type="range" id="yt-volume" min="0" max="100" value="70"
+                    oninput="window.changeRadioVolume(this.value)">
+            </div>
+        </div>
+        <div id="yt-status-text" class="yt-status">Radyo kapalı.</div>
+        <audio id="radio-audio-player" preload="none"></audio>
+    </div>
+
     <!-- Toast Container -->
     <div id="toast-container" class="toast-container"></div>
 
@@ -79,33 +106,6 @@
                 </button>
             </div>
         </header>
-        <!-- Radio panel -->
-        <div class="header-radio-panel" id="header-radio-panel">
-            <select id="radio-station" class="radio-select">
-                <option value="https://listen.powerapp.com.tr/powerturk/mpeg/icecast.audio">🎧 PowerTürk</option>
-                <option value="https://listen.powerapp.com.tr/powerpop/mpeg/icecast.audio">🎧 Power Pop</option>
-                <option value="https://radios.trt.net.tr/trtfm">🎧 TRT FM</option>
-                <option value="https://listen.powerapp.com.tr/powerapparabesk/mpeg/icecast.audio">🎧 Power Arabesk
-                </option>
-                <option value="https://yayin.kralfm.com.tr/kralfm/mp3/icecast.audio">🎧 Kral FM</option>
-            </select>
-            <div class="radio-inline-controls">
-                <button class="btn yt-btn play" id="yt-play-btn" onclick="window.playRadio()">
-                    <span class="material-icons-round" id="yt-play-icon">play_arrow</span> Dinle
-                </button>
-                <button class="btn yt-btn stop" onclick="window.stopRadio()">
-                    <span class="material-icons-round">stop</span> Kapat
-                </button>
-                <div class="radio-volume">
-                    <span class="material-icons-round">volume_up</span>
-                    <input type="range" id="yt-volume" min="0" max="100" value="70"
-                        oninput="window.changeRadioVolume(this.value)">
-                </div>
-            </div>
-            <div id="yt-status-text" class="yt-status">Radyo kapalı.</div>
-            <audio id="radio-audio-player" preload="none"></audio>
-        </div>
-
         <!-- Görev İstatistikleri -->
         <div class="stats-bar">
             <div class="stat-chip pending"><span class="material-icons-round">schedule</span> <span
