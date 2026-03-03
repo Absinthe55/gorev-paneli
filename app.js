@@ -517,8 +517,7 @@ function renderWorkerTasks() {
     }
     workerTasks.innerHTML = '';
     filtered.forEach(task => {
-        // Mark as seen
-        if (!task.seenAt && task.status === 'pending') markTaskAsSeen(task.id);
+        // Mark as seen taşındı -> toggleTaskCard içerisine
 
         const statusMap = {
             pending: { icon: 'schedule', text: 'Bekliyor', cls: 'pending' },
@@ -551,7 +550,7 @@ function renderWorkerTasks() {
         }
 
         workerTasks.insertAdjacentHTML('beforeend', `
-            <div class="task-card priority-${task.priority}" onclick="toggleTaskCard(this, event)">
+            <div class="task-card priority-${task.priority}" onclick="window.toggleTaskCard(this, event, '${task.id}', '${task.status}', '${task.seenAt || ''}')">
                 <div class="task-header">
                     <div class="task-title">${task.title}</div>
                     <div class="task-time">${time}</div>
@@ -666,11 +665,15 @@ window.completeTaskWithImage = async function (taskId) {
     } catch (e) { showToast('Durum güncellenemedi!', 'error'); if (btn) { btn.disabled = false; } }
 };
 
-window.toggleTaskCard = function (card, event) {
+window.toggleTaskCard = function (card, event, taskId, status, seenAt) {
     if (event.target.tagName.toLowerCase() === 'button' || event.target.closest('button')) {
         return;
     }
     card.classList.toggle('expanded');
+
+    if (card.classList.contains('expanded') && taskId && status === 'pending' && !seenAt) {
+        window.markTaskAsSeen(taskId);
+    }
 };
 
 window.openImageModal = function (url, event) {
