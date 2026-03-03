@@ -749,14 +749,19 @@ body {
     display: flex;
 }
 
-#yt-url-input {
+.radio-select {
     width: 100%;
     padding: 0.6rem;
     border-radius: var(--radius-sm);
     border: 1px solid rgba(255, 255, 255, 0.2);
-    background: rgba(0, 0, 0, 0.1);
+    background: rgba(0, 0, 0, 0.4);
     color: var(--clr-text-main);
-    font-size: 0.85rem;
+    font-size: 0.9rem;
+}
+
+.radio-select option {
+    background: #1e293b;
+    color: white;
 }
 
 .yt-controls {

@@ -3,10 +3,6 @@ let currentUser = null;
 let currentRole = null;
 let tasks = [];
 let unsubscribe = null; // To hold the Firestore listener
-let ytPlayer = null;
-let ytPlayerReady = false;
-let currentYtVideoId = null;
-
 // DOM Elements
 const screens = {
     login: document.getElementById('login-screen'),
@@ -479,90 +475,12 @@ function showToast(message, icon) {
 }
 
 // ==========================================
-// YOUTUBE AUDIO PLAYER & BACKGROUND HACK LOGIC
+// CANLI RADYO (ARKA PLAN OYNATMA) MANTIĞI
 // ==========================================
 
-// Create a silent audio element to keep the browser awake
-const silentAudio = new Audio('silence.mp3');
-silentAudio.loop = true;
-
-// This function is automatically called by the YouTube IFrame API script when it loads
-window.onYouTubeIframeAPIReady = function () {
-    ytPlayer = new YT.Player('yt-player-container', {
-        height: '0',
-        width: '0',
-        videoId: '',
-        playerVars: {
-            'autoplay': 0,
-            'controls': 0,
-            'disablekb': 1,
-            'fs': 0,
-            'playsinline': 1
-        },
-        events: {
-            'onReady': onPlayerReady,
-            'onStateChange': onPlayerStateChange,
-            'onError': onPlayerError
-        }
-    });
-};
-
-function onPlayerReady(event) {
-    ytPlayerReady = true;
-    event.target.setVolume(50);
-}
-
-function onPlayerStateChange(event) {
-    const statusText = document.getElementById('yt-status-text');
-    const playIcon = document.getElementById('yt-play-icon');
-
-    if (event.data == YT.PlayerState.PLAYING) {
-        statusText.textContent = "Çalıyor...";
-        playIcon.textContent = "pause";
-        // Start silent audio to keep tab alive
-        silentAudio.play().catch(e => console.log("Silent audio autoplay blocked, waiting for user interaction."));
-        updateMediaSession('Oynatılıyor', 'Titan Görev Paneli');
-    } else if (event.data == YT.PlayerState.PAUSED) {
-        statusText.textContent = "Duraklatıldı";
-        playIcon.textContent = "play_arrow";
-        silentAudio.pause();
-    } else if (event.data == YT.PlayerState.ENDED) {
-        statusText.textContent = "Müzik Bitti";
-        playIcon.textContent = "play_arrow";
-        silentAudio.pause();
-    } else if (event.data == YT.PlayerState.BUFFERING) {
-        statusText.textContent = "Yükleniyor...";
-    }
-}
-
-// Update the native mobile lock screen controls
-function updateMediaSession(title, artist) {
-    if ('mediaSession' in navigator) {
-        navigator.mediaSession.metadata = new MediaMetadata({
-            title: title,
-            artist: artist,
-            album: 'Arka Plan Müziği',
-            artwork: [
-                { src: 'https://cdn-icons-png.flaticon.com/512/1055/1055183.png', sizes: '512x512', type: 'image/png' }
-            ]
-        });
-
-        navigator.mediaSession.setActionHandler('play', function () { window.playYtAudio(); });
-        navigator.mediaSession.setActionHandler('pause', function () { window.stopYtAudio(); });
-    }
-}
-
-function onPlayerError(event) {
-    console.error("YouTube Player Error:", event.data);
-    showToast("Video yüklenemedi. Link hatalı veya video gizli olabilir.", "error");
-    document.getElementById('yt-status-text').textContent = "Hata oluştu";
-}
-
-function parseYouTubeId(url) {
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-    const match = url.match(regExp);
-    return (match && match[2].length === 11) ? match[2] : null;
-}
+const radioAudio = document.getElementById('radio-audio-player');
+const statusText = document.getElementById('yt-status-text');
+const playIcon = document.getElementById('yt-play-icon');
 
 window.toggleYtPlayer = function () {
     const body = document.getElementById('yt-body');
@@ -577,59 +495,65 @@ window.toggleYtPlayer = function () {
     }
 };
 
-window.playYtAudio = function () {
-    if (!ytPlayerReady) {
-        showToast("Player henüz yüklenmedi, bekleyin.", "warning");
-        return;
+window.playRadio = function () {
+    const selectElem = document.getElementById('radio-station');
+    const streamUrl = selectElem.value;
+    const radioName = selectElem.options[selectElem.selectedIndex].text;
+
+    // Check if we are resuming the same stream or starting a new one
+    if (radioAudio.src !== streamUrl) {
+        radioAudio.src = streamUrl;
     }
 
-    // User interacted, now safe to play the silent audio hack
-    silentAudio.play().catch(e => console.log(e));
+    // Toggle play/pause
+    if (radioAudio.paused) {
+        statusText.textContent = "Bağlanıyor...";
+        playIcon.textContent = "hourglass_empty";
 
-    const urlInput = document.getElementById('yt-url-input').value.trim();
-    if (!urlInput) {
-        showToast("Lütfen bir YouTube linki girin!", "warning");
-        return;
-    }
-
-    const videoId = parseYouTubeId(urlInput);
-    if (!videoId) {
-        showToast("Geçerli bir YouTube linki bulunamadı.", "error");
-        return;
-    }
-
-    // If playing a new video
-    if (videoId !== currentYtVideoId) {
-        currentYtVideoId = videoId;
-        ytPlayer.loadVideoById(videoId);
+        radioAudio.play().then(() => {
+            statusText.textContent = radioName + " Devrede";
+            playIcon.textContent = "pause";
+            updateMediaSession(radioName, 'Titan Fabrika Radyosu');
+        }).catch(err => {
+            console.error('Radyo oynatılamadı:', err);
+            showToast("Radyo yayın akışına bağlanılamadı!", "error");
+            statusText.textContent = "Bağlantı Hatası";
+            playIcon.textContent = "play_arrow";
+        });
     } else {
-        // Toggle play/pause for current video
-        const state = ytPlayer.getPlayerState();
-        if (state === YT.PlayerState.PLAYING) {
-            ytPlayer.pauseVideo();
-        } else {
-            ytPlayer.playVideo();
-        }
+        radioAudio.pause();
+        statusText.textContent = "Radyo Duraklatıldı.";
+        playIcon.textContent = "play_arrow";
     }
 };
 
-window.stopYtAudio = function () {
-    if (ytPlayerReady && ytPlayer) {
-        ytPlayer.stopVideo();
-        silentAudio.pause();
-        document.getElementById('yt-status-text').textContent = "Durduruldu";
-        document.getElementById('yt-play-icon').textContent = "play_arrow";
+window.stopRadio = function () {
+    if (!radioAudio.paused) {
+        radioAudio.pause();
     }
+    radioAudio.src = ""; // Clear buffer
+    statusText.textContent = "Radyo Kapatıldı.";
+    playIcon.textContent = "play_arrow";
 };
 
-window.changeYtVolume = function (val) {
-    if (ytPlayerReady && ytPlayer) {
-        ytPlayer.setVolume(val);
-    }
+window.changeRadioVolume = function (val) {
+    radioAudio.volume = val / 100;
 };
 
-// Dynamically load the YouTube IFrame API to ensure our callback is ready
-const tag = document.createElement('script');
-tag.src = "https://www.youtube.com/iframe_api";
-const firstScriptTag = document.getElementsByTagName('script')[0];
-firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+// Update the native mobile lock screen controls (Keeps it playing!)
+function updateMediaSession(title, artist) {
+    if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+            title: title + " (Canlı Yayın)",
+            artist: artist,
+            album: 'Çalışma Müzikleri',
+            artwork: [
+                { src: 'https://cdn-icons-png.flaticon.com/512/1055/1055183.png', sizes: '512x512', type: 'image/png' }
+            ]
+        });
+
+        navigator.mediaSession.setActionHandler('play', function () { window.playRadio(); });
+        navigator.mediaSession.setActionHandler('pause', function () { window.stopRadio(); });
+        navigator.mediaSession.setActionHandler('stop', function () { window.stopRadio(); });
+    }
+}
