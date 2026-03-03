@@ -284,7 +284,7 @@
     <!-- Firebase SDK Kurulumu (CDN üzerinden) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, updateDoc, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, updateDoc, doc, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCw5SWA0IphZg1DcvpwuybwGaPabs3ewfc",
@@ -309,6 +309,7 @@
         window.updateDoc = updateDoc;
         window.doc = doc;
         window.deleteDoc = deleteDoc;
+        window.getDocs = getDocs;
     </script>
     <script src="app.js"></script>
 </body>
