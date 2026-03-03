@@ -178,8 +178,17 @@
                     <div class="task-container" id="supervisor-leaves"></div>
                 </section>
                 <section class="glass-panel" style="margin-top:1rem">
-                    <h3><span class="material-icons-round">calendar_month</span> İzin Takvimi</h3>
-                    <div id="leave-calendar-view"></div>
+                    <div class="calendar-header-wrap">
+                        <h3><span class="material-icons-round">calendar_month</span> İzin Takvimi</h3>
+                        <div class="calendar-controls">
+                            <button class="icon-btn" onclick="window.changeCalendarMonth(-1)"><span
+                                    class="material-icons-round">chevron_left</span></button>
+                            <span id="sup-calendar-month-year" style="font-weight:600; font-size:1rem;"></span>
+                            <button class="icon-btn" onclick="window.changeCalendarMonth(1)"><span
+                                    class="material-icons-round">chevron_right</span></button>
+                        </div>
+                    </div>
+                    <div class="calendar-grid" id="leave-calendar-view"></div>
                 </section>
             </div>
 
@@ -271,8 +280,17 @@
                     </form>
                 </section>
                 <section class="glass-panel" style="margin-top:1rem">
-                    <h3><span class="material-icons-round">calendar_month</span> İzin Takvimi</h3>
-                    <div id="wrk-leave-calendar-view"></div>
+                    <div class="calendar-header-wrap">
+                        <h3><span class="material-icons-round">calendar_month</span> İzin Takvimi</h3>
+                        <div class="calendar-controls">
+                            <button class="icon-btn" onclick="window.changeCalendarMonth(-1)"><span
+                                    class="material-icons-round">chevron_left</span></button>
+                            <span id="wrk-calendar-month-year" style="font-weight:600; font-size:1rem;"></span>
+                            <button class="icon-btn" onclick="window.changeCalendarMonth(1)"><span
+                                    class="material-icons-round">chevron_right</span></button>
+                        </div>
+                    </div>
+                    <div class="calendar-grid" id="wrk-leave-calendar-view"></div>
                 </section>
             </div>
 

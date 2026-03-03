@@ -655,31 +655,77 @@ window.updateLeaveStatus = async function (leaveId, status) {
     } catch (e) { showToast('Durum güncellenemedi', 'error'); }
 };
 
+let currentCalendarDate = new Date(); // Takvim için şu anki ay
+
+window.changeCalendarMonth = function (offset) {
+    currentCalendarDate.setMonth(currentCalendarDate.getMonth() + offset);
+    renderLeaveCalendar();
+};
+
 function renderLeaveCalendar() {
     const approved = leaves.filter(l => l.status === 'approved');
-    const containers = ['leave-calendar-view', 'wrk-leave-calendar-view'];
-    containers.forEach(id => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        if (approved.length === 0) {
-            el.innerHTML = '<div class="empty-state">Onaylanmış izin bulunmuyor.</div>';
-            return;
+    const containers = [
+        { grid: 'leave-calendar-view', header: 'sup-calendar-month-year' },
+        { grid: 'wrk-leave-calendar-view', header: 'wrk-calendar-month-year' }
+    ];
+
+    const year = currentCalendarDate.getFullYear();
+    const month = currentCalendarDate.getMonth();
+
+    const monthNames = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+    const monthYearText = `${monthNames[month]} ${year}`;
+
+    // Ayın ilk günü ve son günü
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    // JS'te getDay() Pazar'ı 0 verir. Pazartesi(1) - Pazar(7) yapmak için:
+    const startDayOfWeek = firstDay === 0 ? 7 : firstDay;
+
+    containers.forEach(c => {
+        const gridEl = document.getElementById(c.grid);
+        const headerEl = document.getElementById(c.header);
+
+        if (!gridEl || !headerEl) return;
+
+        headerEl.innerText = monthYearText;
+        gridEl.innerHTML = ''; // Temizle
+
+        // Hafta günleri başlıkları
+        const weekdays = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+        weekdays.forEach(day => {
+            gridEl.insertAdjacentHTML('beforeend', `<div class="calendar-weekday">${day}</div>`);
+        });
+
+        // Bos kutucuklar (Ayın ilk gününden önceki günler)
+        for (let i = 1; i < startDayOfWeek; i++) {
+            gridEl.insertAdjacentHTML('beforeend', `<div class="calendar-day empty"></div>`);
         }
-        el.innerHTML = '';
-        approved.forEach(l => {
-            const sd = new Date(l.start).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long' });
-            const ed = new Date(l.end).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long' });
-            el.insertAdjacentHTML('beforeend', `
-                <div class="leave-calendar-item">
-                    <div class="lc-avatar"><span class="material-icons-round">person</span></div>
-                    <div class="lc-info">
-                        <strong>${l.worker}</strong>
-                        <span>${sd} – ${ed}</span>
-                    </div>
-                    <span class="chip chip-completed" style="flex-shrink:0">İzinli</span>
+
+        // Günleri oluştur
+        for (let i = 1; i <= daysInMonth; i++) {
+            const currentDateStr = new Date(year, month, i).toLocaleDateString('en-CA'); // YYYY-MM-DD format, yerel farksız
+
+            // Bu günde izinli olanları bul
+            const leavesToday = approved.filter(l => {
+                const start = new Date(l.start).setHours(0, 0, 0, 0);
+                const end = new Date(l.end).setHours(23, 59, 59, 999);
+                const current = new Date(year, month, i).setHours(12, 0, 0, 0);
+                return current >= start && current <= end;
+            });
+
+            // İzin rozetlerini oluştur
+            const badgesHtml = leavesToday.map(l =>
+                `<div class="leave-badge" title="${l.worker}">${l.worker.split(' ')[0]}</div>`
+            ).join('');
+
+            gridEl.insertAdjacentHTML('beforeend', `
+                <div class="calendar-day">
+                    <div class="cd-num">${i}</div>
+                    ${badgesHtml}
                 </div>
             `);
-        });
+        }
     });
 }
 
