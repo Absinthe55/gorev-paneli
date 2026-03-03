@@ -646,7 +646,7 @@ function renderSupervisorLeaves() {
                 </button>
             </div>`;
         list.insertAdjacentHTML('beforeend', `
-            <div class="task-card">
+            <div class="task-card" onclick="window.toggleTaskCard(this, event)">
                 <div class="task-header">
                     <div class="task-title"><span class="material-icons-round" style="font-size:1rem;vertical-align:middle">person</span> ${lv.worker}</div>
                 </div>
@@ -702,7 +702,7 @@ function renderWorkerLeaves() {
         actionsHtml += `<button class="action-btn danger" onclick="window.deleteLeave('${lv.id}')"><span class="material-icons-round">delete</span> Sil</button>`;
 
         list.insertAdjacentHTML('beforeend', `
-            <div class="task-card">
+            <div class="task-card" onclick="window.toggleTaskCard(this, event)">
                 <div class="task-chips" style="margin-top: 0;">
                     <span class="chip chip-muted"><span class="material-icons-round">date_range</span> ${sd} → ${ed}</span>
                     <span class="chip chip-${st.cls}">${st.label}</span>
