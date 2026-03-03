@@ -199,6 +199,11 @@ if (taskImageInput) {
 // ─── INIT ───────────────────────────────────────────────────
 
 async function init() {
+    const debug = document.getElementById('debug-info');
+    if (!navigator.onLine && debug) {
+        debug.innerHTML = 'İnternet bağlantısı yok! Lütfen kontrol edin.';
+    }
+
     const savedUser = localStorage.getItem('titan_user');
     const savedRole = localStorage.getItem('titan_role');
     if (savedUser && savedRole) {
@@ -271,7 +276,9 @@ async function fetchUsers() {
     } catch (e) {
         console.error("fetchUsers error:", e);
         const listContainer = document.getElementById('login-user-list');
-        if (listContainer) listContainer.innerHTML = '<div style="color:red;text-align:center">Bağlantı Hatası!</div>';
+        if (listContainer) listContainer.innerHTML = '<div style="color:red;text-align:center">Veri alınamadı!</div>';
+        const debug = document.getElementById('debug-info');
+        if (debug) debug.innerHTML = `Bağlantı Hatası: ${e.message}<br>Firebase kuralları veya önbellek (cache) sorunu olabilir. Lütfen ekranı yenileyin.`;
     }
 }
 
