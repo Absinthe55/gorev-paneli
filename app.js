@@ -30,26 +30,35 @@ document.addEventListener('DOMContentLoaded', init);
 if (loginForm) {
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const usernameInput = document.getElementById('username').value;
+
+        if (!selectedLoginUser) {
+            showToast('Lütfen listeden bir kişi seçin.', 'error');
+            return;
+        }
+
         const passwordInput = document.getElementById('password').value;
         const loginBtn = document.getElementById('login-btn');
 
-        if (usernameInput && passwordInput) {
+        if (passwordInput) {
             loginBtn.disabled = true;
             loginBtn.innerHTML = '<span class="material-icons-round">hourglass_empty</span> Doğrulanıyor...';
 
-            // Find user in fetched systemUsers array
-            const user = systemUsers.find(u => u.name === usernameInput);
+            if (selectedLoginRole) {
+                // Find user in fetched systemUsers array securely
+                const user = systemUsers.find(u => u.name === selectedLoginUser);
 
-            if (user && user.password === passwordInput) {
-                login(user.name, user.role);
-                document.getElementById('password').value = ''; // Clear pwd
-            } else {
-                showToast('Hatalı şifre girdiniz.', 'error');
+                if (user && user.password === passwordInput) {
+                    login(user.name, user.role);
+                    document.getElementById('password').value = ''; // Clear pwd
+                } else {
+                    showToast('Hatalı şifre girdiniz.', 'error');
+                }
             }
 
             loginBtn.disabled = false;
             loginBtn.innerHTML = 'Giriş Yap <span class="material-icons-round">arrow_forward</span>';
+        } else {
+            showToast('Lütfen şifrenizi girin.', 'warning');
         }
     });
 }
@@ -111,23 +120,37 @@ async function init() {
     await fetchUsers();
 }
 
+let selectedLoginUser = null;
+let selectedLoginRole = null;
+
 async function fetchUsers() {
     try {
         const querySnapshot = await window.getDocs(window.collection(window.db, "users"));
         systemUsers = [];
-        const userSelect = document.getElementById('username');
-        if (userSelect) {
-            userSelect.innerHTML = '<option value="" disabled selected>Giriş Yapılacak Kişi</option>';
-        }
+
+        const listContainer = document.getElementById('login-user-list');
+        if (listContainer) listContainer.innerHTML = '';
 
         querySnapshot.forEach((doc) => {
             const userData = doc.data();
             systemUsers.push({ id: doc.id, ...userData });
-            if (userSelect) {
-                const opt = document.createElement('option');
-                opt.value = userData.name;
-                opt.textContent = `${userData.name} (${userData.role === 'supervisor' ? 'Amir' : 'Usta'})`;
-                userSelect.appendChild(opt);
+
+            if (listContainer) {
+                const roleIcon = userData.role === 'supervisor' ? 'admin_panel_settings' : 'engineering';
+                const roleText = userData.role === 'supervisor' ? 'Amir' : 'Usta';
+
+                const cardHtml = `
+                    <div class="login-card-user" data-uid="${doc.id}" data-name="${userData.name}" data-role="${userData.role}">
+                        <div class="icon-box">
+                            <span class="material-icons-round">${roleIcon}</span>
+                        </div>
+                        <div class="user-info">
+                            <span class="name">${userData.name}</span>
+                            <span class="role">${roleText}</span>
+                        </div>
+                    </div>
+                `;
+                listContainer.insertAdjacentHTML('beforeend', cardHtml);
             }
         });
 
@@ -141,10 +164,26 @@ async function fetchUsers() {
             fetchUsers();
         }
 
+        // Add click events to new cards
+        if (listContainer) {
+            const cards = listContainer.querySelectorAll('.login-card-user');
+            cards.forEach(card => {
+                card.addEventListener('click', () => {
+                    // Remove active from all
+                    cards.forEach(c => c.classList.remove('active'));
+                    // Add active to clicked
+                    card.classList.add('active');
+
+                    selectedLoginUser = card.getAttribute('data-name');
+                    selectedLoginRole = card.getAttribute('data-role');
+                });
+            });
+        }
+
     } catch (e) {
         console.error("Error fetching users", e);
-        if (document.getElementById('username')) {
-            document.getElementById('username').innerHTML = '<option value="" disabled>Bağlantı Hatası!</option>';
+        if (document.getElementById('login-user-list')) {
+            document.getElementById('login-user-list').innerHTML = '<div style="color:var(--clr-status-urgent); text-align:center;">Bağlantı Hatası!</div>';
         }
     }
 }

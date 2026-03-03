@@ -454,6 +454,45 @@ body {
     border-color: rgba(255, 255, 255, 0.2);
 }
 
+.login-card-user.active {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: var(--clr-status-completed);
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
+}
+
+.login-card-user .icon-box {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-right: 1rem;
+    color: var(--clr-primary);
+}
+
+.login-card-user.active .icon-box {
+    background: var(--clr-status-completed);
+    color: white;
+}
+
+.login-card-user .user-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.login-card-user .user-info .name {
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: var(--clr-text-main);
+}
+
+.login-card-user .user-info .role {
+    font-size: 0.8rem;
+    color: var(--clr-text-muted);
+}
+
 .user-avatar {
     width: 48px;
     height: 48px;

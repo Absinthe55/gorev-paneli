@@ -36,23 +36,22 @@
                 <p>Hidrolik Birimi Görev Yönetimi</p>
             </div>
 
-            <form id="login-form">
-                <div class="input-group">
-                    <span class="material-icons-round">person</span>
-                    <select id="username" required>
-                        <option value="" disabled selected>Kullanıcı Yükleniyor...</option>
-                    </select>
+            <!-- Yeni Görsel Seçim Listesi (Faz 2) -->
+            <div class="login-options" id="login-user-list">
+                <div class="login-card-user" style="justify-content: center; color: var(--clr-text-muted);">
+                    Kullanıcılar Yükleniyor...
                 </div>
+            </div>
 
-                <div class="input-group">
-                    <span class="material-icons-round">lock</span>
-                    <input type="password" id="password" autocomplete="current-password" placeholder="Şifre" required>
-                </div>
+            <div class="input-group">
+                <span class="material-icons-round">lock</span>
+                <input type="password" id="password" autocomplete="current-password" placeholder="Şifre" required>
+            </div>
 
-                <button type="submit" class="btn primary-btn pulse-effect" id="login-btn">
-                    Giriş Yap
-                    <span class="material-icons-round">arrow_forward</span>
-                </button>
+            <button type="submit" class="btn primary-btn pulse-effect" id="login-btn">
+                Giriş Yap
+                <span class="material-icons-round">arrow_forward</span>
+            </button>
             </form>
             <div class="hint">Devam etmek için hesabınızı seçin ve şifrenizi girin.</div>
         </div>
