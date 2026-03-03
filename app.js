@@ -1001,10 +1001,64 @@ window.promptEditPassword = async function (userId, userName) {
             });
             showToast('Şifre başarıyla güncellendi.', 'vpn_key');
             renderSystemUsers();
-            fetchUsers(); // Refresh global state
+            fetchUsers();
         } catch (e) {
             console.error("Password update error", e);
             showToast('Şifre güncellenirken hata oluştu.', 'error');
         }
     }
+}
+
+// ================================
+//  RADIO PLAYER FUNCTIONS
+// ================================
+
+window.toggleHeaderRadio = function () {
+    const panel = document.getElementById('header-radio-panel');
+    const btns = document.querySelectorAll('.radio-toggle-btn');
+    if (!panel) return;
+    panel.classList.toggle('open');
+    const isOpen = panel.classList.contains('open');
+    btns.forEach(btn => btn.classList.toggle('active', isOpen));
+}
+
+window.playRadio = function () {
+    const station = document.getElementById('radio-station');
+    const audio = document.getElementById('radio-audio-player');
+    const statusEl = document.getElementById('yt-status-text');
+    const playIcon = document.getElementById('yt-play-icon');
+    if (!audio || !station) return;
+    audio.src = station.value;
+    audio.play()
+        .then(() => {
+            if (statusEl) statusEl.textContent = '▶ Yayın dinleniyor...';
+            if (playIcon) playIcon.textContent = 'pause';
+        })
+        .catch(err => {
+            console.error('Radio error:', err);
+            if (statusEl) statusEl.textContent = '⚠ Yayın başlatılamadı.';
+        });
+
+    if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+            title: station.options[station.selectedIndex].text,
+            artist: 'Canlı Radyo',
+        });
+    }
+}
+
+window.stopRadio = function () {
+    const audio = document.getElementById('radio-audio-player');
+    const statusEl = document.getElementById('yt-status-text');
+    const playIcon = document.getElementById('yt-play-icon');
+    if (!audio) return;
+    audio.pause();
+    audio.src = '';
+    if (statusEl) statusEl.textContent = 'Radyo kapalı.';
+    if (playIcon) playIcon.textContent = 'play_arrow';
+}
+
+window.changeRadioVolume = function (val) {
+    const audio = document.getElementById('radio-audio-player');
+    if (audio) audio.volume = val / 100;
 }

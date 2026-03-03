@@ -410,6 +410,55 @@ input[type="date"] {
     transform: translateY(-2px);
 }
 
+/* Header actions group */
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Collapsible Radio Panel just below the header */
+.header-radio-panel {
+    display: none;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    background: rgba(15, 23, 42, 0.9);
+    border-bottom: 1px solid rgba(59, 130, 246, 0.3);
+    flex-shrink: 0;
+    animation: fadeIn 0.2s ease;
+}
+
+.header-radio-panel.open {
+    display: flex;
+}
+
+.radio-inline-controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.radio-volume {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--clr-text-muted);
+    flex: 1;
+    min-width: 120px;
+}
+
+.radio-volume input {
+    flex: 1;
+}
+
+.radio-toggle-btn.active {
+    background: rgba(59, 130, 246, 0.2);
+    color: var(--clr-primary);
+    border-color: rgba(59, 130, 246, 0.4);
+}
+
 /* ================================
    LOGIN USER CARDS
    ================================ */
