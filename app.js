@@ -623,7 +623,8 @@ function renderSupervisorLeaves() {
         const statusMap = {
             pending: { cls: 'pending', label: 'Bekliyor' },
             approved: { cls: 'completed', label: 'Onaylandı' },
-            rejected: { cls: 'urgent', label: 'Reddedildi' }
+            rejected: { cls: 'urgent', label: 'Reddedildi' },
+            cancelled: { cls: 'danger', label: 'İptal Edildi' }
         };
         const st = statusMap[lv.status] || statusMap.pending;
         const actions = lv.status === 'pending' ? `
