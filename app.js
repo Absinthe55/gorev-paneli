@@ -875,7 +875,10 @@ function renderSystemUsers() {
                 <div class="task-card" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; margin-bottom: 0.5rem; background: rgba(255,255,255,0.03);">
                     <div>
                         <div style="font-weight: 600; font-size: 1.1rem; color: var(--clr-text);">${u.name}</div>
-                        <div style="margin-top: 0.3rem; font-size: 0.85rem; color: var(--clr-text-muted);">Şifre: <span style="font-family: monospace; background: rgba(255,255,255,0.1); padding: 0.1rem 0.4rem; border-radius: 4px; color: white;">${u.password}</span></div>
+                        <div style="margin-top: 0.3rem; font-size: 0.85rem; color: var(--clr-text-muted); display: flex; align-items: center; gap: 0.5rem;">
+                            Şifre: <span style="font-family: monospace; background: rgba(255,255,255,0.1); padding: 0.1rem 0.4rem; border-radius: 4px; color: white;">${u.password}</span>
+                            <span class="material-icons-round" style="font-size: 1rem; cursor: pointer; color: var(--clr-primary);" onclick="window.promptEditPassword('${u.id}', '${u.name}')" title="Şifreyi Değiştir">edit</span>
+                        </div>
                     </div>
                     <div>
                         ${roleBadge}
@@ -934,5 +937,22 @@ window.promptDeleteUser = async function () {
         }
     } else {
         showToast('Bu isimde bir personel bulunamadı.', 'error');
+    }
+}
+
+window.promptEditPassword = async function (userId, userName) {
+    const newPassword = prompt(`${userName} kullanıcısı için yeni şifre belirleyin:`);
+    if (newPassword && newPassword.trim() !== '') {
+        try {
+            await window.updateDoc(window.doc(window.db, "users", userId), {
+                password: newPassword.trim()
+            });
+            showToast('Şifre başarıyla güncellendi.', 'vpn_key');
+            renderSystemUsers();
+            fetchUsers(); // Refresh global state
+        } catch (e) {
+            console.error("Password update error", e);
+            showToast('Şifre güncellenirken hata oluştu.', 'error');
+        }
     }
 }
