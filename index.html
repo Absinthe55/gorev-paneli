@@ -261,25 +261,29 @@
 
             <!-- İZİN AL SEKMESİ -->
             <div id="wrk-tab-calendar" class="tab-content">
-                <section class="leave-request-section glass-panel">
-                    <h3><span class="material-icons-round">flight_takeoff</span> Yıllık İzin Talep Et</h3>
-                    <form id="leave-form">
-                        <label class="date-label">Başlangıç Tarihi</label>
-                        <div class="input-group dark">
-                            <span class="material-icons-round">calendar_today</span>
-                            <input type="date" id="leave-start" required>
-                        </div>
-                        <label class="date-label">Bitiş Tarihi</label>
-                        <div class="input-group dark">
-                            <span class="material-icons-round">event_busy</span>
-                            <input type="date" id="leave-end" required>
-                        </div>
-                        <button type="submit" class="btn secondary-btn" id="submit-leave-btn">
-                            <span class="material-icons-round">send</span> İzin Talebi Gönder
-                        </button>
-                    </form>
-                </section>
-                <section class="glass-panel" style="margin-top:1rem">
+        <section class="leave-request-section glass-panel">
+            <h3><span class="material-icons-round">flight_takeoff</span> Yıllık İzin Talep Et</h3>
+            <form id="leave-form">
+                <label class="date-label">Başlangıç Tarihi</label>
+                <div class="input-group dark">
+                    <span class="material-icons-round">calendar_today</span>
+                    <input type="date" id="leave-start" required>
+                </div>
+                <label class="date-label">Bitiş Tarihi</label>
+                <div class="input-group dark">
+                    <span class="material-icons-round">event_busy</span>
+                    <input type="date" id="leave-end" required>
+                </div>
+                <button type="submit" class="btn secondary-btn" id="submit-leave-btn">
+                    <span class="material-icons-round">send</span> İzin Talebi Gönder
+                </button>
+            </form>
+        </section>
+        <section class="glass-panel" style="margin-top:1rem">
+            <h3><span class="material-icons-round">list_alt</span> Taleplerim</h3>
+            <div class="task-container" id="worker-leaves"></div>
+        </section>
+        <section class="glass-panel" style="margin-top:1rem">
                     <div class="calendar-header-wrap">
                         <h3><span class="material-icons-round">calendar_month</span> İzin Takvimi</h3>
                         <div class="calendar-controls">

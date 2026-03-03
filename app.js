@@ -327,6 +327,7 @@ window.switchTab = function (role, tabName, navItem) {
     if (tabName === 'calendar') {
         renderLeaveCalendar();
         if (role === 'supervisor') renderSupervisorLeaves();
+        if (role === 'worker') renderWorkerLeaves();
     }
     if (tabName === 'materials') {
         if (role === 'supervisor') renderSupervisorMaterials();
@@ -606,6 +607,7 @@ function listenForLeaves() {
         leaves = [];
         snap.forEach(d => leaves.push({ id: d.id, ...d.data() }));
         if (currentRole === 'supervisor') renderSupervisorLeaves();
+        if (currentRole === 'worker') renderWorkerLeaves();
         renderLeaveCalendar();
     });
 }
@@ -632,7 +634,16 @@ function renderSupervisorLeaves() {
                 <button class="action-btn danger" onclick="window.updateLeaveStatus('${lv.id}','rejected')">
                     <span class="material-icons-round">thumb_down</span> Reddet
                 </button>
-            </div>` : '';
+                <button class="action-btn danger" onclick="window.deleteLeave('${lv.id}')">
+                    <span class="material-icons-round">delete</span> Sil
+                </button>
+            </div>` : `
+            <div class="task-actions" style="gap:.5rem;margin-top:.8rem">
+                ${lv.status === 'approved' ? `<button class="action-btn danger" onclick="window.updateLeaveStatus('${lv.id}','cancelled')"><span class="material-icons-round">cancel</span> İptal Et</button>` : ''}
+                <button class="action-btn danger" onclick="window.deleteLeave('${lv.id}')">
+                    <span class="material-icons-round">delete</span> Sil
+                </button>
+            </div>`;
         list.insertAdjacentHTML('beforeend', `
             <div class="task-card">
                 <div class="task-header">
@@ -651,9 +662,57 @@ function renderSupervisorLeaves() {
 window.updateLeaveStatus = async function (leaveId, status) {
     try {
         await window.updateDoc(window.doc(window.db, "leaves", leaveId), { status });
-        showToast(status === 'approved' ? 'İzin onaylandı.' : 'İzin reddedildi.', status === 'approved' ? 'thumb_up' : 'thumb_down');
+        const msg = status === 'approved' ? 'İzin onaylandı.' : (status === 'cancelled' ? 'İzin iptal edildi.' : 'İzin reddedildi.');
+        const icon = status === 'approved' ? 'thumb_up' : (status === 'cancelled' ? 'cancel' : 'thumb_down');
+        showToast(msg, icon);
     } catch (e) { showToast('Durum güncellenemedi', 'error'); }
 };
+
+window.deleteLeave = async function (leaveId) {
+    if (confirm("Bu izin talebini silmek istediğinize emin misiniz?")) {
+        try {
+            await window.deleteDoc(window.doc(window.db, "leaves", leaveId));
+            showToast('İzin silindi.', 'delete');
+        } catch (e) { showToast('Silinemedi.', 'error'); }
+    }
+};
+
+function renderWorkerLeaves() {
+    const list = document.getElementById('worker-leaves');
+    if (!list) return;
+    const myLeaves = leaves.filter(l => l.worker === currentUser);
+    if (myLeaves.length === 0) { list.innerHTML = '<div class="empty-state">Henüz izin talebiniz yok.</div>'; return; }
+    list.innerHTML = '';
+    myLeaves.forEach(lv => {
+        const sd = new Date(lv.start).toLocaleDateString('tr-TR');
+        const ed = new Date(lv.end).toLocaleDateString('tr-TR');
+        const statusMap = {
+            pending: { cls: 'pending', label: 'Bekliyor' },
+            approved: { cls: 'completed', label: 'Onaylandı' },
+            rejected: { cls: 'urgent', label: 'Reddedildi' },
+            cancelled: { cls: 'danger', label: 'İptal Edildi' }
+        };
+        const st = statusMap[lv.status] || statusMap.pending;
+
+        let actionsHtml = '';
+        if (lv.status === 'pending' || lv.status === 'approved') {
+            actionsHtml += `<button class="action-btn danger" onclick="window.updateLeaveStatus('${lv.id}','cancelled')"><span class="material-icons-round">cancel</span> İptal Et</button>`;
+        }
+        actionsHtml += `<button class="action-btn danger" onclick="window.deleteLeave('${lv.id}')"><span class="material-icons-round">delete</span> Sil</button>`;
+
+        list.insertAdjacentHTML('beforeend', `
+            <div class="task-card">
+                <div class="task-chips" style="margin-top: 0;">
+                    <span class="chip chip-muted"><span class="material-icons-round">date_range</span> ${sd} → ${ed}</span>
+                    <span class="chip chip-${st.cls}">${st.label}</span>
+                </div>
+                <div class="task-actions" style="gap:.5rem;margin-top:.8rem">
+                    ${actionsHtml}
+                </div>
+            </div>
+        `);
+    });
+}
 
 let currentCalendarDate = new Date(); // Takvim için şu anki ay
 
