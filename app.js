@@ -211,10 +211,6 @@ if (docsForm) {
             console.log("Documents upload started for:", file.name);
             const fileName = `documents/${Date.now()}_${file.name}`;
 
-            if (!window.storage || !window.ref || !window.uploadBytes || !window.getDownloadURL) {
-                throw new Error("Firebase Storage bağlantısı kurulamadı. index.html eksik olabilir.");
-            }
-
             let downloadUrls = [];
 
             if (file.type === 'application/pdf') {
@@ -227,7 +223,7 @@ if (docsForm) {
                 for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
                     btn.innerHTML = `<span class="material-icons-round spinning">sync</span> Sayfa çevriliyor (${pageNum}/${totalPages})...`;
                     const page = await pdf.getPage(pageNum);
-                    const viewport = page.getViewport({ scale: 1.5 }); // High quality
+                    const viewport = page.getViewport({ scale: 1.2 }); // Optimize for Firestore size limit
 
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
@@ -236,40 +232,15 @@ if (docsForm) {
 
                     await page.render({ canvasContext: ctx, viewport: viewport }).promise;
 
-                    const imageBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85));
-
-                    const fileName = `documents/${Date.now()}_page_${pageNum}.jpg`;
-                    const storageRef = window.ref(window.storage, fileName);
-
-                    btn.innerHTML = `<span class="material-icons-round spinning">sync</span> Yükleniyor (${pageNum}/${totalPages})...`;
-                    await Promise.race([
-                        window.uploadBytes(storageRef, imageBlob),
-                        timeoutPromise(30000)
-                    ]);
-
-                    const url = await Promise.race([
-                        window.getDownloadURL(storageRef),
-                        timeoutPromise(10000)
-                    ]);
-                    downloadUrls.push(url);
+                    // Upload directly as Base64 string directly inside Firestore, matching task images
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.65);
+                    downloadUrls.push(dataUrl);
                 }
             } else {
                 // Regular Image 
-                const fileName = `documents/${Date.now()}_${file.name}`;
-                const storageRef = window.ref(window.storage, fileName);
-
-                console.log("Uploading bytes to Firebase...");
-                await Promise.race([
-                    window.uploadBytes(storageRef, file),
-                    timeoutPromise(30000)
-                ]);
-
-                console.log("Getting download URL...");
-                const downloadUrl = await Promise.race([
-                    window.getDownloadURL(storageRef),
-                    timeoutPromise(10000)
-                ]);
-                downloadUrls.push(downloadUrl);
+                btn.innerHTML = `<span class="material-icons-round spinning">sync</span> Resim işleniyor...`;
+                const dataUrl = await compressImage(file, 1200); // 1200px max width for documents
+                downloadUrls.push(dataUrl);
             }
 
             console.log("Adding doc to Firestore...");
