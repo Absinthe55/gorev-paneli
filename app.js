@@ -965,7 +965,7 @@ function renderSupervisorMaterials() {
         const commentsHtml = (m.comments || []).map(c =>
             `<div class="comment ${c.role}"><strong>${c.author}:</strong> ${c.text}</div>`
         ).join('');
-        const imageHtml = m.imageUrl ? `<div class="task-img-wrap" style="display:block;opacity:1"><img src="${m.imageUrl}" loading="lazy" onclick="openImageModal('${m.imageUrl}', event)"></div>` : '';
+        const imageHtml = m.imageUrl ? `<div class="task-img-wrap"><img src="${m.imageUrl}" loading="lazy" onclick="openImageModal('${m.imageUrl}', event)"></div>` : '';
         list.insertAdjacentHTML('beforeend', `
         <div class="task-card" onclick="window.toggleTaskCard(this, event)">
                 <div class="task-header">
@@ -1011,7 +1011,7 @@ function renderWorkerMaterials() {
         const commentsHtml = (m.comments || []).map(c =>
             `<div class="comment ${c.role}"><strong>${c.author}:</strong> ${c.text}</div>`
         ).join('');
-        const imageHtml = m.imageUrl ? `<div class="task-img-wrap" style="display:block;opacity:1"><img src="${m.imageUrl}" loading="lazy" onclick="openImageModal('${m.imageUrl}', event)"></div>` : '';
+        const imageHtml = m.imageUrl ? `<div class="task-img-wrap"><img src="${m.imageUrl}" loading="lazy" onclick="openImageModal('${m.imageUrl}', event)"></div>` : '';
         list.insertAdjacentHTML('beforeend', `
         <div class="task-card" onclick="window.toggleTaskCard(this, event)">
                 <div class="task-header">
