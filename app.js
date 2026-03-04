@@ -901,12 +901,12 @@ function renderLeaveCalendar() {
         // Hafta günleri başlıkları
         const weekdays = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
         weekdays.forEach(day => {
-            gridEl.insertAdjacentHTML('beforeend', `< div class= "calendar-weekday" > ${day}</div > `);
+            gridEl.insertAdjacentHTML('beforeend', `<div class="calendar-weekday">${day}</div>`);
         });
 
         // Bos kutucuklar (Ayın ilk gününden önceki günler)
         for (let i = 1; i < startDayOfWeek; i++) {
-            gridEl.insertAdjacentHTML('beforeend', `< div class= "calendar-day empty" ></div > `);
+            gridEl.insertAdjacentHTML('beforeend', `<div class="calendar-day empty"></div>`);
         }
 
         // Günleri oluştur
@@ -923,14 +923,14 @@ function renderLeaveCalendar() {
 
             // İzin rozetlerini oluştur
             const badgesHtml = leavesToday.map(l =>
-                `< div class= "leave-badge ${l.status === 'pending' ? 'pending' : ''}" title = "${l.worker}" > ${l.worker.split(' ')[0]}</div > `
+                `<div class="leave-badge ${l.status === 'pending' ? 'pending' : ''}" title="${l.worker}">${l.worker.split(' ')[0]}</div>`
             ).join('');
 
             gridEl.insertAdjacentHTML('beforeend', `
-        < div class= "calendar-day" >
-        <div class="cd-num">${i}</div>
+                <div class="calendar-day">
+                    <div class="cd-num">${i}</div>
                     ${badgesHtml}
-                </div >
+                </div>
             `);
         }
     });
