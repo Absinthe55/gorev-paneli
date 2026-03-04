@@ -381,6 +381,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, query, orderBy, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
+        import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCw5SWA0IphZg1DcvpwuybWgaPabs3ewfc",
@@ -395,9 +396,13 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const storage = getStorage(app);
+        const messaging = getMessaging(app);
 
         // Expose Firebase API to app.js
         window.db = db;
+        window.messaging = messaging;
+        window.getToken = getToken;
+        window.onMessage = onMessage;
         window.collection = collection;
         window.addDoc = addDoc;
         window.onSnapshot = onSnapshot;

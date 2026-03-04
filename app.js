@@ -429,6 +429,58 @@ function login(username, role, showWelcome = true) {
     listenForLeaves();
     listenForMaterials();
     listenForDocuments();
+    requestAndSaveFCMToken(username);
+}
+
+async function requestAndSaveFCMToken(username) {
+    if (!('Notification' in window) || !window.messaging) return;
+
+    try {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+            console.log("Bildirim izni verildi. FCM token alınıyor...");
+            // VAPID anahtarınızı Firebase Console'dan Cloud Messaging -> Web Push Certificates altından almalısınız.
+            // Bu örnekte oluşturulmuş örnek bir VAPID key gösterilmektedir. Lütfen kendi anahtarınızla değiştirin.
+            const currentToken = await window.getToken(window.messaging, {
+                vapidKey: 'BMr0hN_xR2-GvQ8gN-n_tG8_U6lH6B2C8nE3qB5eXNn8vU3E5x8HnC6xM5y_Q5eXG9nX7mG5oK2mV9bN3cJ5k'
+            });
+
+            if (currentToken) {
+                console.log("FCM Token alındı:", currentToken);
+
+                // Firestore'da kullanıcının dokümanını bul (name alanına göre)
+                const q = window.query(window.collection(window.db, "users"), window.orderBy("name"));
+                const querySnapshot = await window.getDocs(q);
+                let userId = null;
+
+                querySnapshot.forEach((doc) => {
+                    if (doc.data().name === username) {
+                        userId = doc.id;
+                    }
+                });
+
+                // Kullanıcının FCM token bilgisini kaydet
+                if (userId) {
+                    await window.updateDoc(window.doc(window.db, "users", userId), {
+                        fcmToken: currentToken
+                    });
+                    console.log("FCM Token Firestore'a kullanıcı bilgisine kaydedildi.");
+
+                    // Ön tarafta mesaj alındığında ne yapılacağı
+                    window.onMessage(window.messaging, (payload) => {
+                        console.log('Ön Planda Mesaj Alındı: ', payload);
+                        showToast(payload.notification.title + ': ' + payload.notification.body, 'notifications_active');
+                    });
+                }
+            } else {
+                console.warn('Bildirim tokeni alınamadı.');
+            }
+        } else {
+            console.warn("Kullanıcı bildirim iznini reddetti.");
+        }
+    } catch (err) {
+        console.error('Bildirim izni istenirken veya token alınırken hata:', err);
+    }
 }
 
 function logout() {
