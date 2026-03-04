@@ -963,11 +963,11 @@ function renderSupervisorMaterials() {
         };
         const st = statusMap[m.status] || statusMap.pending;
         const commentsHtml = (m.comments || []).map(c =>
-            `< div class= "comment ${c.role}" > <strong>${c.author}:</strong> ${c.text}</div > `
+            `<div class="comment ${c.role}"><strong>${c.author}:</strong> ${c.text}</div>`
         ).join('');
-        const imageHtml = m.imageUrl ? `< div class= "task-img-wrap" style = "display:block;opacity:1" > <img src="${m.imageUrl}" loading="lazy" onclick="openImageModal('${m.imageUrl}', event)"></div>` : '';
+        const imageHtml = m.imageUrl ? `<div class="task-img-wrap" style="display:block;opacity:1"><img src="${m.imageUrl}" loading="lazy" onclick="openImageModal('${m.imageUrl}', event)"></div>` : '';
         list.insertAdjacentHTML('beforeend', `
-        < div class= "task-card" onclick = "window.toggleTaskCard(this, event)" >
+        <div class="task-card" onclick="window.toggleTaskCard(this, event)">
                 <div class="task-header">
                     <div class="task-title"><span class="material-icons-round" style="font-size:1rem;vertical-align:middle">inventory_2</span> ${m.name}</div>
                 </div>
@@ -977,7 +977,7 @@ function renderSupervisorMaterials() {
                 </div>
                 ${m.desc ? `<p class="mat-desc">${m.desc}</p>` : ''}
                 ${imageHtml}
-        < div class= "comments-section" > ${commentsHtml}</div >
+        <div class="comments-section">${commentsHtml}</div>
                 <div class="comment-form" onclick="event.stopPropagation()">
                     <input type="text" class="comment-input" id="mc-${m.id}" placeholder="Yorum ekle...">
                     <button class="action-btn" onclick="window.addComment('${m.id}')"><span class="material-icons-round">send</span></button>
@@ -1009,11 +1009,11 @@ function renderWorkerMaterials() {
         };
         const st = statusMap[m.status] || statusMap.pending;
         const commentsHtml = (m.comments || []).map(c =>
-            `< div class= "comment ${c.role}" > <strong>${c.author}:</strong> ${c.text}</div > `
+            `<div class="comment ${c.role}"><strong>${c.author}:</strong> ${c.text}</div>`
         ).join('');
-        const imageHtml = m.imageUrl ? `< div class= "task-img-wrap" style = "display:block;opacity:1" > <img src="${m.imageUrl}" loading="lazy" onclick="openImageModal('${m.imageUrl}', event)"></div>` : '';
+        const imageHtml = m.imageUrl ? `<div class="task-img-wrap" style="display:block;opacity:1"><img src="${m.imageUrl}" loading="lazy" onclick="openImageModal('${m.imageUrl}', event)"></div>` : '';
         list.insertAdjacentHTML('beforeend', `
-        < div class= "task-card" onclick = "window.toggleTaskCard(this, event)" >
+        <div class="task-card" onclick="window.toggleTaskCard(this, event)">
                 <div class="task-header">
                     <div class="task-title">${m.name}</div>
                 </div>
@@ -1022,7 +1022,7 @@ function renderWorkerMaterials() {
                 </div>
                 ${m.desc ? `<p class="mat-desc">${m.desc}</p>` : ''}
                 ${imageHtml}
-        < div class= "comments-section" > ${commentsHtml}</div >
+        <div class="comments-section">${commentsHtml}</div>
         <div class="comment-form" onclick="event.stopPropagation()">
             <input type="text" class="comment-input" id="mc-${m.id}" placeholder="Yorum ekle...">
                 <button class="action-btn" onclick="window.addComment('${m.id}')"><span class="material-icons-round">send</span></button>
@@ -1145,7 +1145,7 @@ function showToast(message, icon) {
     if (!toastContainer) return;
     const t = document.createElement('div');
     t.className = 'toast';
-    t.innerHTML = `< span class= "material-icons-round" > ${icon || 'info'}</span > ${message}`;
+    t.innerHTML = `<span class="material-icons-round">${icon || 'info'}</span> ${message}`;
     toastContainer.appendChild(t);
     setTimeout(() => { t.style.animation = 'toastLeave 0.3s forwards'; setTimeout(() => t.remove(), 300); }, 3000);
 }
