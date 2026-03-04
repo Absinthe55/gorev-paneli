@@ -1033,7 +1033,7 @@ function renderWorkerMaterials() {
 }
 
 window.addComment = async function (materialId) {
-    const input = document.getElementById(`mc - ${materialId}`);
+    const input = document.getElementById(`mc-${materialId}`);
     if (!input || !input.value.trim()) return;
     try {
         const mat = materials.find(m => m.id === materialId);
