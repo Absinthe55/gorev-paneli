@@ -905,14 +905,21 @@ function renderSupervisorMaterials() {
             rejected: { cls: 'danger', label: 'Reddedildi' }
         };
         const st = statusMap[m.status] || statusMap.pending;
-        const commentsHtml = (m.comments || []).map(c =>
-            `<div class="comment ${c.role}"><strong>${c.author}:</strong> ${c.text}</div>`
-        ).join('');
+
+        const openTime = m.timestamp ? new Date(m.timestamp).toLocaleString('tr-TR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }) : '';
+        const resolvedTime = m.resolvedAt && (m.status === 'resolved' || m.status === 'approved' || m.status === 'rejected') ? ` | Kapanış: ${new Date(m.resolvedAt).toLocaleString('tr-TR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}` : '';
+        const timeHtml = `<div class="task-time">${openTime}${resolvedTime}</div>`;
+
+        const commentsHtml = (m.comments || []).map(c => {
+            const commentTime = c.ts ? `<span style="font-size:0.7rem;color:var(--clr-text-muted);margin-left:5px">(${new Date(c.ts).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })})</span>` : '';
+            return `<div class="comment ${c.role}"><strong>${c.author}:</strong> ${c.text} ${commentTime}</div>`
+        }).join('');
         const imageHtml = m.imageUrl ? `<div class="task-img-wrap"><img src="${m.imageUrl}" loading="lazy" onclick="openImageModal('${m.imageUrl}', event)"></div>` : '';
         list.insertAdjacentHTML('beforeend', `
         <div class="task-card" onclick="window.toggleTaskCard(this, event)">
                 <div class="task-header">
                     <div class="task-title"><span class="material-icons-round" style="font-size:1rem;vertical-align:middle">inventory_2</span> ${m.name}</div>
+                    ${timeHtml}
                 </div>
                 <div class="task-chips">
                     <span class="chip chip-muted"><span class="material-icons-round">person</span> ${m.worker}</span>
@@ -951,14 +958,21 @@ function renderWorkerMaterials() {
             rejected: { cls: 'danger', label: 'Reddedildi' }
         };
         const st = statusMap[m.status] || statusMap.pending;
-        const commentsHtml = (m.comments || []).map(c =>
-            `<div class="comment ${c.role}"><strong>${c.author}:</strong> ${c.text}</div>`
-        ).join('');
+
+        const openTime = m.timestamp ? new Date(m.timestamp).toLocaleString('tr-TR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }) : '';
+        const resolvedTime = m.resolvedAt && (m.status === 'resolved' || m.status === 'approved' || m.status === 'rejected') ? ` | Kapanış: ${new Date(m.resolvedAt).toLocaleString('tr-TR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}` : '';
+        const timeHtml = `<div class="task-time">${openTime}${resolvedTime}</div>`;
+
+        const commentsHtml = (m.comments || []).map(c => {
+            const commentTime = c.ts ? `<span style="font-size:0.7rem;color:var(--clr-text-muted);margin-left:5px">(${new Date(c.ts).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })})</span>` : '';
+            return `<div class="comment ${c.role}"><strong>${c.author}:</strong> ${c.text} ${commentTime}</div>`
+        }).join('');
         const imageHtml = m.imageUrl ? `<div class="task-img-wrap"><img src="${m.imageUrl}" loading="lazy" onclick="openImageModal('${m.imageUrl}', event)"></div>` : '';
         list.insertAdjacentHTML('beforeend', `
         <div class="task-card" onclick="window.toggleTaskCard(this, event)">
                 <div class="task-header">
                     <div class="task-title">${m.name}</div>
+                    ${timeHtml}
                 </div>
                 <div class="task-chips">
                     <span class="chip chip-${st.cls}">${st.label}</span>
@@ -990,14 +1004,20 @@ window.addComment = async function (materialId) {
 
 window.resolveMaterial = async function (materialId) {
     try {
-        await window.updateDoc(window.doc(window.db, "materials", materialId), { status: 'resolved' });
+        await window.updateDoc(window.doc(window.db, "materials", materialId), {
+            status: 'resolved',
+            resolvedAt: new Date().toISOString()
+        });
         showToast('Talep çözüldü olarak işaretlendi.', 'check_circle');
     } catch (e) { showToast('Güncellenemedi.', 'error'); }
 };
 
 window.updateMaterialStatus = async function (materialId, status) {
     try {
-        await window.updateDoc(window.doc(window.db, "materials", materialId), { status });
+        await window.updateDoc(window.doc(window.db, "materials", materialId), {
+            status,
+            resolvedAt: new Date().toISOString()
+        });
         const msgs = { 'approved': 'Talebi onayladınız.', 'rejected': 'Talebi reddettiniz.' };
         const iconClasses = { 'approved': 'check_circle', 'rejected': 'cancel' };
         showToast(msgs[status] || 'Durum güncellendi.', iconClasses[status] || 'info');
