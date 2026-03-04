@@ -456,6 +456,7 @@ body {
     letter-spacing: 1.5px;
     background: linear-gradient(135deg, #e2e8f0, #94a3b8);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
 }
 
@@ -570,13 +571,15 @@ body {
 
 .inline-input-row {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.5rem;
     align-items: stretch;
 }
 
 .inline-password-input {
     flex: 1 1 auto;
-    min-width: 0;
+    width: 100%;
+    min-width: 120px;
     background: rgba(0, 0, 0, 0.2);
     border: 1px solid var(--clr-border);
     border-radius: var(--r-sm);
