@@ -12,7 +12,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=2.4">
+    <link rel="stylesheet" href="style.css?v=3.0">
 </head>
 
 <body>
@@ -273,7 +273,11 @@
                     </form>
                 </section>
                 <section class="glass-panel" style="margin-top:1rem">
+<<<<<<< HEAD
                     <h3><span class="material-icons-round">list_alt</span> İzilerim / Taleplerim</h3>
+=======
+                    <h3><span class="material-icons-round">list_alt</span> Taleplerim</h3>
+>>>>>>> 8d1a93702c147d94d8bb7a359598280a53e69e92
                     <div class="task-container" id="worker-leaves"></div>
                 </section>
                 <section class="glass-panel" style="margin-top:1rem">
@@ -304,6 +308,14 @@
                             <span class="material-icons-round">notes</span>
                             <input type="text" id="material-desc" placeholder="Açıklama (opsiyonel)">
                         </div>
+                        <div class="file-upload-group">
+                            <input type="file" id="material-image" accept="image/*" class="file-input">
+                            <label for="material-image" class="file-label">
+                                <span class="material-icons-round">add_a_photo</span>
+                                <span id="mat-file-name-display">Fotoğraf Ekle (Opsiyonel)</span>
+                            </label>
+                            <img id="mat-image-preview" class="image-preview" style="display:none">
+                        </div>
                         <button type="submit" class="btn primary-btn" id="submit-material-btn">
                             <span class="material-icons-round">send</span> Talep Gönder
                         </button>
@@ -329,10 +341,11 @@
         </nav>
     </main>
 
-    <script src="app.js?v=2.4"></script>
+    <script src="app.js?v=3.0"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, query, orderBy, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCw5SWA0IphZg1DcvpwuybWgaPabs3ewfc",
@@ -346,6 +359,7 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+        const storage = getStorage(app);
 
         // Expose Firebase API to app.js
         window.db = db;
@@ -358,6 +372,10 @@
         window.orderBy = orderBy;
         window.getDocs = getDocs;
         window.deleteDoc = deleteDoc;
+        window.storage = storage;
+        window.ref = ref;
+        window.uploadBytes = uploadBytes;
+        window.getDownloadURL = getDownloadURL;
 
         // Firebase is ready — now bootstrap the app
         window.firebaseReady = true;

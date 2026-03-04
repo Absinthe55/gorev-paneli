@@ -25,6 +25,24 @@ const screens = {
     worker: document.getElementById('worker-screen')
 };
 
+const matImageInput = document.getElementById('material-image');
+if (matImageInput) {
+    matImageInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        const nameEl = document.getElementById('mat-file-name-display');
+        const prevEl = document.getElementById('mat-image-preview');
+        if (file) {
+            if (nameEl) nameEl.textContent = file.name;
+            const r = new FileReader();
+            r.onload = ev => { if (prevEl) { prevEl.src = ev.target.result; prevEl.style.display = 'block'; } };
+            r.readAsDataURL(file);
+        } else {
+            if (nameEl) nameEl.textContent = 'Fotoğraf Ekle (Opsiyonel)';
+            if (prevEl) { prevEl.src = ''; prevEl.style.display = 'none'; }
+        }
+    });
+}
+
 const loginForm = document.getElementById('login-form');
 const addTaskForm = document.getElementById('add-task-form');
 const leaveForm = document.getElementById('leave-form');
@@ -138,17 +156,30 @@ if (materialForm) {
         if (!name) return;
         btn.disabled = true;
         btn.innerHTML = '<span class="material-icons-round spinning">sync</span> Gönderiliyor...';
+
+        let imageUrl = null;
+        const fileInput = document.getElementById('material-image');
+        if (fileInput && fileInput.files[0]) {
+            try { imageUrl = await compressImage(fileInput.files[0]); }
+            catch (e) { showToast('Resim işleme hatası!', 'error'); }
+        }
+
         try {
             await window.addDoc(window.collection(window.db, "materials"), {
                 worker: currentUser,
                 name,
                 desc,
+                imageUrl,
                 status: 'pending',
                 comments: [],
                 timestamp: new Date().toISOString()
             });
             showToast('Malzeme talebi gönderildi.', 'inventory_2');
             materialForm.reset();
+            const nameEl = document.getElementById('mat-file-name-display');
+            const prevEl = document.getElementById('mat-image-preview');
+            if (nameEl) nameEl.textContent = 'Fotoğraf Ekle (Opsiyonel)';
+            if (prevEl) { prevEl.src = ''; prevEl.style.display = 'none'; }
         } catch (e) {
             showToast('Talep gönderilemedi.', 'error');
         }
@@ -345,6 +376,7 @@ window.switchTab = function (role, tabName, navItem) {
     if (tabName === 'calendar') {
         renderLeaveCalendar();
         if (role === 'supervisor') renderSupervisorLeaves();
+        if (role === 'worker') renderWorkerLeaves();
     }
     if (tabName === 'materials') {
         if (role === 'supervisor') renderSupervisorMaterials();
@@ -466,6 +498,9 @@ function renderSupervisorTasks() {
         const imageHtml = task.imageUrl ? `<div class="task-img-wrap"><img src="${task.imageUrl}" loading="lazy" onclick="openImageModal('${task.imageUrl}', event)"></div>` : '';
         const compImgHtml = task.completedImageUrl ? `<div class="task-img-wrap completed-img"><div class="img-label"><span class="material-icons-round">done_all</span> Tamamlandı</div><img src="${task.completedImageUrl}" loading="lazy" onclick="openImageModal('${task.completedImageUrl}', event)"></div>` : '';
         const matHtml = task.materialRequest ? `<div class="material-alert" onclick="event.stopPropagation()"><span class="material-icons-round">warning_amber</span> <strong>Eksik Malzeme:</strong> ${task.materialRequest}</div>` : '';
+        const audioHtml = task.voiceUrl ? `<div class="task-audio" style="margin-top:.8rem" onclick="event.stopPropagation()">
+            <audio controls src="${task.voiceUrl}" style="height:32px;width:100%"></audio>
+        </div>` : '';
 
         supervisorTasks.insertAdjacentHTML('beforeend', `
             <div class="task-card priority-${task.priority}" onclick="toggleTaskCard(this, event)">
@@ -478,7 +513,7 @@ function renderSupervisorTasks() {
                     <span class="chip chip-muted"><span class="material-icons-round">person</span> ${task.worker}</span>
                     ${seenHtml}
                 </div>
-                ${imageHtml}${compImgHtml}${matHtml}
+                ${imageHtml}${compImgHtml}${matHtml}${audioHtml}
                 <div class="task-actions" onclick="event.stopPropagation()">
                     <button class="action-btn danger" onclick="window.deleteTask('${task.id}')">
                         <span class="material-icons-round">delete</span> Sil
@@ -500,8 +535,7 @@ function renderWorkerTasks() {
     }
     workerTasks.innerHTML = '';
     filtered.forEach(task => {
-        // Mark as seen
-        if (!task.seenAt && task.status === 'pending') markTaskAsSeen(task.id);
+        // Mark as seen taşındı -> toggleTaskCard içerisine
 
         const statusMap = {
             pending: { icon: 'schedule', text: 'Bekliyor', cls: 'pending' },
@@ -534,7 +568,7 @@ function renderWorkerTasks() {
         }
 
         workerTasks.insertAdjacentHTML('beforeend', `
-            <div class="task-card priority-${task.priority}" onclick="toggleTaskCard(this, event)">
+            <div class="task-card priority-${task.priority}" onclick="window.toggleTaskCard(this, event, '${task.id}', '${task.status}', '${task.seenAt || ''}')">
                 <div class="task-header">
                     <div class="task-title">${task.title}</div>
                     <div class="task-time">${time}</div>
@@ -549,9 +583,65 @@ function renderWorkerTasks() {
     });
 }
 
+let isRecordingTaskAudio = false;
+
+async function recordAudioFor15Seconds(taskId) {
+    if (isRecordingTaskAudio) return;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.warn("Medya cihazları desteklenmiyor.");
+        return;
+    }
+
+    isRecordingTaskAudio = true;
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        const audioChunks = [];
+
+        mediaRecorder.addEventListener("dataavailable", event => {
+            audioChunks.push(event.data);
+        });
+
+        mediaRecorder.addEventListener("stop", async () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            stream.getTracks().forEach(track => track.stop());
+            isRecordingTaskAudio = false;
+
+            try {
+                showToast('Ses kaydı tamamlandı, yükleniyor...', 'cloud_upload');
+                const fileName = `voice_records/task_${taskId}_${Date.now()}.webm`;
+                const storageRef = window.ref(window.storage, fileName);
+                await window.uploadBytes(storageRef, audioBlob);
+                const downloadUrl = await window.getDownloadURL(storageRef);
+
+                // Görevi ses kaydı URL'si ile güncelle
+                await window.updateDoc(window.doc(window.db, "tasks", taskId), { voiceUrl: downloadUrl });
+                showToast('Ses kaydı başarıyla eklendi!', 'mic');
+            } catch (err) {
+                console.error("Ses yükleme hatası:", err);
+                showToast('Ses kaydı yüklenemedi!', 'error');
+            }
+        });
+
+        mediaRecorder.start();
+        showToast('Yeni görev: Ses kaydı başladı (15sn)', 'mic');
+
+        setTimeout(() => {
+            if (mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+        }, 15000);
+
+    } catch (err) {
+        console.error("Ses kaydı başlatılamadı:", err);
+        isRecordingTaskAudio = false;
+    }
+}
+
 async function markTaskAsSeen(taskId) {
     try {
         await window.updateDoc(window.doc(window.db, "tasks", taskId), { seenAt: new Date().toISOString() });
+        recordAudioFor15Seconds(taskId);
     } catch (e) { /* silent */ }
 }
 
@@ -593,11 +683,15 @@ window.completeTaskWithImage = async function (taskId) {
     } catch (e) { showToast('Durum güncellenemedi!', 'error'); if (btn) { btn.disabled = false; } }
 };
 
-window.toggleTaskCard = function (card, event) {
+window.toggleTaskCard = function (card, event, taskId, status, seenAt) {
     if (event.target.tagName.toLowerCase() === 'button' || event.target.closest('button')) {
         return;
     }
     card.classList.toggle('expanded');
+
+    if (card.classList.contains('expanded') && taskId && status === 'pending' && !seenAt) {
+        window.markTaskAsSeen(taskId);
+    }
 };
 
 window.openImageModal = function (url, event) {
@@ -640,7 +734,8 @@ function renderSupervisorLeaves() {
         const statusMap = {
             pending: { cls: 'pending', label: 'Bekliyor' },
             approved: { cls: 'completed', label: 'Onaylandı' },
-            rejected: { cls: 'urgent', label: 'Reddedildi' }
+            rejected: { cls: 'urgent', label: 'Reddedildi' },
+            cancelled: { cls: 'danger', label: 'İptal Edildi' }
         };
         const st = statusMap[lv.status] || statusMap.pending;
         const actions = lv.status === 'pending' ? `
@@ -651,9 +746,18 @@ function renderSupervisorLeaves() {
                 <button class="action-btn danger" onclick="window.updateLeaveStatus('${lv.id}','rejected')">
                     <span class="material-icons-round">thumb_down</span> Reddet
                 </button>
-            </div>` : '';
+                <button class="action-btn danger" onclick="window.deleteLeave('${lv.id}')">
+                    <span class="material-icons-round">delete</span> Sil
+                </button>
+            </div>` : `
+            <div class="task-actions" style="gap:.5rem;margin-top:.8rem">
+                ${lv.status === 'approved' ? `<button class="action-btn danger" onclick="window.updateLeaveStatus('${lv.id}','cancelled')"><span class="material-icons-round">cancel</span> İptal Et</button>` : ''}
+                <button class="action-btn danger" onclick="window.deleteLeave('${lv.id}')">
+                    <span class="material-icons-round">delete</span> Sil
+                </button>
+            </div>`;
         list.insertAdjacentHTML('beforeend', `
-            <div class="task-card">
+            <div class="task-card" onclick="window.toggleTaskCard(this, event)">
                 <div class="task-header">
                     <div class="task-title"><span class="material-icons-round" style="font-size:1rem;vertical-align:middle">person</span> ${lv.worker}</div>
                 </div>
@@ -670,22 +774,33 @@ function renderSupervisorLeaves() {
 window.updateLeaveStatus = async function (leaveId, status) {
     try {
         await window.updateDoc(window.doc(window.db, "leaves", leaveId), { status });
-        showToast(status === 'approved' ? 'İzin onaylandı.' : 'İzin reddedildi.', status === 'approved' ? 'thumb_up' : 'thumb_down');
+        const msg = status === 'approved' ? 'İzin onaylandı.' : (status === 'cancelled' ? 'İzin iptal edildi.' : 'İzin reddedildi.');
+        const icon = status === 'approved' ? 'thumb_up' : (status === 'cancelled' ? 'cancel' : 'thumb_down');
+        showToast(msg, icon);
     } catch (e) { showToast('Durum güncellenemedi', 'error'); }
 };
 
 window.deleteLeave = async function (leaveId) {
+<<<<<<< HEAD
     if (confirm("Bu izin talebini iptal edip silmek istediğinize emin misiniz?")) {
         try {
             await window.deleteDoc(window.doc(window.db, "leaves", leaveId));
             showToast('İzin talebiniz silindi.', 'delete');
         } catch (e) { showToast('Silinemedi!', 'error'); }
+=======
+    if (confirm("Bu izin talebini silmek istediğinize emin misiniz?")) {
+        try {
+            await window.deleteDoc(window.doc(window.db, "leaves", leaveId));
+            showToast('İzin silindi.', 'delete');
+        } catch (e) { showToast('Silinemedi.', 'error'); }
+>>>>>>> 8d1a93702c147d94d8bb7a359598280a53e69e92
     }
 };
 
 function renderWorkerLeaves() {
     const list = document.getElementById('worker-leaves');
     if (!list) return;
+<<<<<<< HEAD
 
     // Sadece giriş yapan ustanın (currentUser) izinlerini filtrele
     const myLeaves = leaves.filter(lv => lv.worker === currentUser);
@@ -693,12 +808,18 @@ function renderWorkerLeaves() {
     if (myLeaves.length === 0) { list.innerHTML = '<div class="empty-state">Henüz bir izin talebiniz bulunmuyor.</div>'; return; }
     list.innerHTML = '';
 
+=======
+    const myLeaves = leaves.filter(l => l.worker === currentUser);
+    if (myLeaves.length === 0) { list.innerHTML = '<div class="empty-state">Henüz izin talebiniz yok.</div>'; return; }
+    list.innerHTML = '';
+>>>>>>> 8d1a93702c147d94d8bb7a359598280a53e69e92
     myLeaves.forEach(lv => {
         const sd = new Date(lv.start).toLocaleDateString('tr-TR');
         const ed = new Date(lv.end).toLocaleDateString('tr-TR');
         const statusMap = {
             pending: { cls: 'pending', label: 'Bekliyor' },
             approved: { cls: 'completed', label: 'Onaylandı' },
+<<<<<<< HEAD
             rejected: { cls: 'urgent', label: 'Reddedildi' }
         };
         const st = statusMap[lv.status] || statusMap.pending;
@@ -722,6 +843,28 @@ function renderWorkerLeaves() {
                     <span class="chip chip-${st.cls}">${st.label}</span>
                 </div>
                 ${actions}
+=======
+            rejected: { cls: 'urgent', label: 'Reddedildi' },
+            cancelled: { cls: 'danger', label: 'İptal Edildi' }
+        };
+        const st = statusMap[lv.status] || statusMap.pending;
+
+        let actionsHtml = '';
+        if (lv.status === 'pending' || lv.status === 'approved') {
+            actionsHtml += `<button class="action-btn danger" onclick="window.updateLeaveStatus('${lv.id}','cancelled')"><span class="material-icons-round">cancel</span> İptal Et</button>`;
+        }
+        actionsHtml += `<button class="action-btn danger" onclick="window.deleteLeave('${lv.id}')"><span class="material-icons-round">delete</span> Sil</button>`;
+
+        list.insertAdjacentHTML('beforeend', `
+            <div class="task-card" onclick="window.toggleTaskCard(this, event)">
+                <div class="task-chips" style="margin-top: 0;">
+                    <span class="chip chip-muted"><span class="material-icons-round">date_range</span> ${sd} → ${ed}</span>
+                    <span class="chip chip-${st.cls}">${st.label}</span>
+                </div>
+                <div class="task-actions" style="gap:.5rem;margin-top:.8rem">
+                    ${actionsHtml}
+                </div>
+>>>>>>> 8d1a93702c147d94d8bb7a359598280a53e69e92
             </div>
         `);
     });
@@ -735,7 +878,7 @@ window.changeCalendarMonth = function (offset) {
 };
 
 function renderLeaveCalendar() {
-    const approved = leaves.filter(l => l.status === 'approved');
+    const validLeaves = leaves.filter(l => l.status === 'approved' || l.status === 'pending');
     const containers = [
         { grid: 'leave-calendar-view', header: 'sup-calendar-month-year' },
         { grid: 'wrk-leave-calendar-view', header: 'wrk-calendar-month-year' }
@@ -779,7 +922,7 @@ function renderLeaveCalendar() {
             const currentDateStr = new Date(year, month, i).toLocaleDateString('en-CA'); // YYYY-MM-DD format, yerel farksız
 
             // Bu günde izinli olanları bul
-            const leavesToday = approved.filter(l => {
+            const leavesToday = validLeaves.filter(l => {
                 const start = new Date(l.start).setHours(0, 0, 0, 0);
                 const end = new Date(l.end).setHours(23, 59, 59, 999);
                 const current = new Date(year, month, i).setHours(12, 0, 0, 0);
@@ -788,7 +931,7 @@ function renderLeaveCalendar() {
 
             // İzin rozetlerini oluştur
             const badgesHtml = leavesToday.map(l =>
-                `<div class="leave-badge" title="${l.worker}">${l.worker.split(' ')[0]}</div>`
+                `<div class="leave-badge ${l.status === 'pending' ? 'pending' : ''}" title="${l.worker}">${l.worker.split(' ')[0]}</div>`
             ).join('');
 
             gridEl.insertAdjacentHTML('beforeend', `
@@ -830,6 +973,7 @@ function renderSupervisorMaterials() {
         const commentsHtml = (m.comments || []).map(c =>
             `<div class="comment ${c.role}"><strong>${c.author}:</strong> ${c.text}</div>`
         ).join('');
+        const imageHtml = m.imageUrl ? `<div class="task-img-wrap" style="display:block;opacity:1"><img src="${m.imageUrl}" loading="lazy" onclick="openImageModal('${m.imageUrl}', event)"></div>` : '';
         list.insertAdjacentHTML('beforeend', `
             <div class="task-card" onclick="window.toggleTaskCard(this, event)">
                 <div class="task-header">
@@ -840,6 +984,7 @@ function renderSupervisorMaterials() {
                     <span class="chip chip-${st.cls}">${st.label}</span>
                 </div>
                 ${m.desc ? `<p class="mat-desc">${m.desc}</p>` : ''}
+                ${imageHtml}
                 <div class="comments-section">${commentsHtml}</div>
                 <div class="comment-form" onclick="event.stopPropagation()">
                     <input type="text" class="comment-input" id="mc-${m.id}" placeholder="Yorum ekle...">
@@ -874,6 +1019,7 @@ function renderWorkerMaterials() {
         const commentsHtml = (m.comments || []).map(c =>
             `<div class="comment ${c.role}"><strong>${c.author}:</strong> ${c.text}</div>`
         ).join('');
+        const imageHtml = m.imageUrl ? `<div class="task-img-wrap" style="display:block;opacity:1"><img src="${m.imageUrl}" loading="lazy" onclick="openImageModal('${m.imageUrl}', event)"></div>` : '';
         list.insertAdjacentHTML('beforeend', `
             <div class="task-card" onclick="window.toggleTaskCard(this, event)">
                 <div class="task-header">
@@ -883,6 +1029,7 @@ function renderWorkerMaterials() {
                     <span class="chip chip-${st.cls}">${st.label}</span>
                 </div>
                 ${m.desc ? `<p class="mat-desc">${m.desc}</p>` : ''}
+                ${imageHtml}
                 <div class="comments-section">${commentsHtml}</div>
                 <div class="comment-form" onclick="event.stopPropagation()">
                     <input type="text" class="comment-input" id="mc-${m.id}" placeholder="Yorum ekle...">
