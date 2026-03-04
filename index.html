@@ -203,11 +203,10 @@
                             <input type="text" id="doc-title" placeholder="Döküman Adı/Başlığı" required>
                         </div>
                         <div class="file-upload-group">
-                            <input type="file" id="doc-file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
-                                class="file-input" required>
+                            <input type="file" id="doc-file" accept=".pdf,.png,.jpg,.jpeg" class="file-input" required>
                             <label for="doc-file" class="file-label" style="justify-content:center">
                                 <span class="material-icons-round">upload_file</span>
-                                <span id="doc-file-name-display">Dosya Seç (PDF, Word, Excel, Resim)</span>
+                                <span id="doc-file-name-display">Dosya Seç (Sadece PDF, PNG, JPG)</span>
                             </label>
                         </div>
                         <button type="submit" class="btn primary-btn" id="submit-doc-btn">
@@ -376,6 +375,11 @@
         </nav>
     </main>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script>
+        // Set workerSrc for pdf.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+    </script>
     <script src="app.js?v=3.0"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";

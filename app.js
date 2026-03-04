@@ -215,26 +215,69 @@ if (docsForm) {
                 throw new Error("Firebase Storage bağlantısı kurulamadı. index.html eksik olabilir.");
             }
 
-            const storageRef = window.ref(window.storage, fileName);
+            let downloadUrls = [];
 
-            // Upload to storage with 30s timeout
-            console.log("Uploading bytes to Firebase...");
-            await Promise.race([
-                window.uploadBytes(storageRef, file),
-                timeoutPromise(30000)
-            ]);
+            if (file.type === 'application/pdf') {
+                btn.innerHTML = '<span class="material-icons-round spinning">sync</span> PDF sayfaları resme çevriliyor...';
 
-            console.log("Getting download URL...");
-            const downloadUrl = await Promise.race([
-                window.getDownloadURL(storageRef),
-                timeoutPromise(10000)
-            ]);
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                const totalPages = pdf.numPages;
+
+                for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+                    btn.innerHTML = `<span class="material-icons-round spinning">sync</span> Sayfa çevriliyor (${pageNum}/${totalPages})...`;
+                    const page = await pdf.getPage(pageNum);
+                    const viewport = page.getViewport({ scale: 1.5 }); // High quality
+
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+
+                    await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+
+                    const imageBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+
+                    const fileName = `documents/${Date.now()}_page_${pageNum}.jpg`;
+                    const storageRef = window.ref(window.storage, fileName);
+
+                    btn.innerHTML = `<span class="material-icons-round spinning">sync</span> Yükleniyor (${pageNum}/${totalPages})...`;
+                    await Promise.race([
+                        window.uploadBytes(storageRef, imageBlob),
+                        timeoutPromise(30000)
+                    ]);
+
+                    const url = await Promise.race([
+                        window.getDownloadURL(storageRef),
+                        timeoutPromise(10000)
+                    ]);
+                    downloadUrls.push(url);
+                }
+            } else {
+                // Regular Image 
+                const fileName = `documents/${Date.now()}_${file.name}`;
+                const storageRef = window.ref(window.storage, fileName);
+
+                console.log("Uploading bytes to Firebase...");
+                await Promise.race([
+                    window.uploadBytes(storageRef, file),
+                    timeoutPromise(30000)
+                ]);
+
+                console.log("Getting download URL...");
+                const downloadUrl = await Promise.race([
+                    window.getDownloadURL(storageRef),
+                    timeoutPromise(10000)
+                ]);
+                downloadUrls.push(downloadUrl);
+            }
 
             console.log("Adding doc to Firestore...");
+            btn.innerHTML = '<span class="material-icons-round spinning">sync</span> Sisteme kaydediliyor...';
             await Promise.race([
                 window.addDoc(window.collection(window.db, "documents"), {
                     title,
-                    url: downloadUrl,
+                    urls: downloadUrls, // Artık bir dizi olarak kaydediyoruz
                     uploader: currentUser,
                     timestamp: new Date().toISOString()
                 }),
@@ -244,7 +287,7 @@ if (docsForm) {
             showToast('Döküman başarıyla yüklendi.', 'cloud_done');
             docsForm.reset();
             const docNameEl = document.getElementById('doc-file-name-display');
-            if (docNameEl) docNameEl.textContent = 'Dosya Seç (PDF, Word, Excel, Resim)';
+            if (docNameEl) docNameEl.textContent = 'Dosya Seç (Sadece PDF, PNG, JPG)';
         } catch (err) {
             console.error("Döküman yükleme hatası detayları:", err);
             // Firebase Storage kuralları veya kapalı olması gibi durumlarda hatayı gösterelim
@@ -1298,6 +1341,7 @@ function renderSupervisorDocs() {
     list.innerHTML = '';
     documentsList.forEach(d => {
         const time = new Date(d.timestamp).toLocaleString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        const pagesCount = d.urls ? d.urls.length : (d.url ? 1 : 0);
         list.insertAdjacentHTML('beforeend', `
             <div class="task-card">
                 <div class="task-header">
@@ -1306,10 +1350,13 @@ function renderSupervisorDocs() {
                 </div>
                 <div class="task-chips">
                     <span class="chip chip-muted">Yükleyen: ${d.uploader}</span>
+                    <span class="chip chip-blue"><span class="material-icons-round">pages</span> ${pagesCount} Sayfa</span>
                 </div>
                 <div class="task-actions" style="margin-top:1rem">
-                    <button class="action-btn success" onclick="window.open('${d.url}', '_blank')"><span class="material-icons-round">download</span> Aç / İndir</button>
+                    <button class="action-btn success" onclick="window.viewDocumentGallery('${d.id}')"><span class="material-icons-round">visibility</span> İncele</button>
                     <button class="action-btn danger" onclick="window.deleteDocument('${d.id}')"><span class="material-icons-round">delete</span> Sil</button>
+                </div>
+                <div id="doc-gallery-${d.id}" class="doc-gallery" style="display:none; margin-top:1rem; border-top:1px solid rgba(255,255,255,0.1); padding-top:1rem;">
                 </div>
             </div>
         `);
@@ -1323,6 +1370,7 @@ function renderWorkerDocs() {
     list.innerHTML = '';
     documentsList.forEach(d => {
         const time = new Date(d.timestamp).toLocaleString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        const pagesCount = d.urls ? d.urls.length : (d.url ? 1 : 0);
         list.insertAdjacentHTML('beforeend', `
             <div class="task-card">
                 <div class="task-header">
@@ -1331,14 +1379,46 @@ function renderWorkerDocs() {
                 </div>
                 <div class="task-chips">
                     <span class="chip chip-muted">Yükleyen: ${d.uploader}</span>
+                    <span class="chip chip-blue"><span class="material-icons-round">pages</span> ${pagesCount} Sayfa</span>
                 </div>
                 <div class="task-actions" style="margin-top:1rem">
-                    <button class="action-btn success" onclick="window.open('${d.url}', '_blank')"><span class="material-icons-round">download</span> Aç / İndir</button>
+                    <button class="action-btn success" onclick="window.viewDocumentGallery('${d.id}')"><span class="material-icons-round">visibility</span> İncele</button>
+                </div>
+                <div id="doc-gallery-${d.id}" class="doc-gallery" style="display:none; margin-top:1rem; border-top:1px solid rgba(255,255,255,0.1); padding-top:1rem;">
                 </div>
             </div>
         `);
     });
 }
+
+window.viewDocumentGallery = function (docId) {
+    const galleryEl = document.getElementById(`doc-gallery-${docId}`);
+    if (!galleryEl) return;
+
+    // Toggle
+    if (galleryEl.style.display === 'block') {
+        galleryEl.style.display = 'none';
+        return;
+    }
+
+    const doc = documentsList.find(d => d.id === docId);
+    if (!doc) return;
+
+    let html = '';
+    const images = doc.urls || (doc.url ? [doc.url] : []);
+
+    images.forEach((url, i) => {
+        html += `
+            <div style="margin-bottom:1rem; text-align:center;">
+                <div style="font-size:0.8rem; color:var(--clr-text-muted); margin-bottom:4px;">Sayfa ${i + 1}</div>
+                <img src="${url}" style="max-width:100%; border-radius:8px; cursor:pointer; border:1px solid rgba(255,255,255,0.1)" onclick="openImageModal('${url}', event)" loading="lazy">
+            </div>
+        `;
+    });
+
+    galleryEl.innerHTML = html;
+    galleryEl.style.display = 'block';
+};
 
 window.deleteDocument = async function (docId) {
     if (confirm("Bu dökümanı silmek istediğinize emin misiniz?")) {
