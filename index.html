@@ -82,18 +82,11 @@
                         <span class="material-icons-round spinning">sync</span> Yükleniyor...
                     </div>
                 </div>
-                <div class="input-group">
-                    <span class="material-icons-round">lock</span>
-                    <input type="password" id="password" autocomplete="current-password" placeholder="Şifre" required>
-                </div>
                 <div id="debug-info"
                     style="font-size:0.75rem;color:var(--clr-danger);text-align:center;margin-bottom:1rem;word-wrap:break-word;">
                 </div>
-                <button type="submit" class="btn primary-btn" id="login-btn">
-                    Giriş Yap <span class="material-icons-round">arrow_forward</span>
-                </button>
-            </form>
-            <div class="hint">Hesabınızı seçin ve şifrenizi girin.</div>
+        </div>
+        <div class="hint">Hesabınızı seçin ve şifrenizi girin.</div>
         </div>
     </main>
 
@@ -278,6 +271,10 @@
                             <span class="material-icons-round">send</span> İzin Talebi Gönder
                         </button>
                     </form>
+                </section>
+                <section class="glass-panel" style="margin-top:1rem">
+                    <h3><span class="material-icons-round">list_alt</span> İzilerim / Taleplerim</h3>
+                    <div class="task-container" id="worker-leaves"></div>
                 </section>
                 <section class="glass-panel" style="margin-top:1rem">
                     <div class="calendar-header-wrap">

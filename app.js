@@ -46,24 +46,36 @@ window.appInit = function () { init(); };
 if (loginForm) {
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        if (!selectedLoginUser) { showToast('Lütfen listeden bir kişi seçin.', 'person'); return; }
-        const passwordInput = document.getElementById('password').value.trim();
-        const loginBtn = document.getElementById('login-btn');
-        if (!passwordInput) { showToast('Lütfen şifrenizi girin.', 'lock'); return; }
-
-        loginBtn.disabled = true;
-        loginBtn.innerHTML = '<span class="material-icons-round spinning">sync</span> Doğrulanıyor...';
-
-        const user = systemUsers.find(u => u.name === selectedLoginUser);
-        if (user && user.password === passwordInput) {
-            login(user.name, user.role);
-            document.getElementById('password').value = '';
-        } else {
-            showToast('Hatalı şifre girdiniz.', 'lock');
-        }
-        loginBtn.disabled = false;
-        loginBtn.innerHTML = 'Giriş Yap <span class="material-icons-round">arrow_forward</span>';
+        // Artık bireysel satırlardan giriş yapıldığı için genel form submit sadece fallback
+        if (!selectedLoginUser) return;
     });
+}
+
+function handleInlineLogin(userName, userRole, btnElement) {
+    const cardGroup = btnElement.closest('.login-card-group');
+    const passwordInput = cardGroup.querySelector('.inline-password-input');
+    const rememberMe = cardGroup.querySelector('.remember-me-checkbox');
+    const passVal = passwordInput.value.trim();
+
+    if (!passVal) { showToast('Lütfen şifrenizi girin.', 'lock'); return; }
+
+    btnElement.disabled = true;
+    btnElement.innerHTML = '<span class="material-icons-round spinning" style="font-size:1rem;margin-right:2px">sync</span>...';
+
+    const user = systemUsers.find(u => u.name === userName);
+    if (user && user.password === passVal) {
+        if (rememberMe && rememberMe.checked) {
+            localStorage.setItem(`remember_${userName}`, passVal);
+        } else {
+            localStorage.removeItem(`remember_${userName}`);
+        }
+        login(user.name, user.role);
+    } else {
+        showToast('Hatalı şifre girdiniz.', 'lock');
+    }
+
+    btnElement.disabled = false;
+    btnElement.innerHTML = 'Giriş <span class="material-icons-round" style="font-size:1rem;margin-left:2px">arrow_forward</span>';
 }
 
 // ─── ADD TASK ───────────────────────────────────────────────
@@ -204,11 +216,7 @@ async function init() {
         debug.innerHTML = 'İnternet bağlantısı yok! Lütfen kontrol edin.';
     }
 
-    const savedUser = localStorage.getItem('titan_user');
-    const savedRole = localStorage.getItem('titan_role');
-    if (savedUser && savedRole) {
-        login(savedUser, savedRole, false);
-    }
+    // Yalnızca kullanıcı bilgilerini çek
     await fetchUsers();
 }
 
@@ -237,12 +245,29 @@ async function fetchUsers() {
             if (listContainer) {
                 const roleIcon = userData.role === 'supervisor' ? 'admin_panel_settings' : 'engineering';
                 const roleText = userData.role === 'supervisor' ? 'Amir' : 'Usta';
+
+                const rememberedPass = localStorage.getItem(`remember_${userData.name}`) || '';
+                const isRemembered = rememberedPass ? 'checked' : '';
+
                 listContainer.insertAdjacentHTML('beforeend', `
-                    <div class="login-card-user" data-uid="${doc.id}" data-name="${userData.name}" data-role="${userData.role}">
-                        <div class="icon-box"><span class="material-icons-round">${roleIcon}</span></div>
-                        <div class="user-info">
-                            <span class="name">${userData.name}</span>
-                            <span class="role">${roleText}</span>
+                    <div class="login-card-group" data-uid="${doc.id}">
+                        <div class="login-card-user" data-name="${userData.name}" data-role="${userData.role}">
+                            <div class="icon-box"><span class="material-icons-round">${roleIcon}</span></div>
+                            <div class="user-info">
+                                <span class="name">${userData.name}</span>
+                                <span class="role">${roleText}</span>
+                            </div>
+                        </div>
+                        <div class="inline-password-form" style="display:none;">
+                            <div class="inline-input-row">
+                                <input type="password" class="inline-password-input" placeholder="Şifreniz" value="${rememberedPass}">
+                                <button type="button" class="btn primary-btn inline-login-btn" onclick="handleInlineLogin('${userData.name}', '${userData.role}', this)">
+                                    Giriş <span class="material-icons-round" style="font-size:1.1rem;margin-left:2px">arrow_forward</span>
+                                </button>
+                            </div>
+                            <label class="remember-me-label">
+                                <input type="checkbox" class="remember-me-checkbox" ${isRemembered}> Beni Hatırla
+                            </label>
                         </div>
                     </div>
                 `);
@@ -264,14 +289,7 @@ async function fetchUsers() {
         }
 
         if (listContainer) {
-            listContainer.querySelectorAll('.login-card-user').forEach(card => {
-                card.addEventListener('click', () => {
-                    listContainer.querySelectorAll('.login-card-user').forEach(c => c.classList.remove('active'));
-                    card.classList.add('active');
-                    selectedLoginUser = card.getAttribute('data-name');
-                    selectedLoginRole = card.getAttribute('data-role');
-                });
-            });
+            attachUserListListeners();
         }
     } catch (e) {
         console.error("fetchUsers error:", e);
@@ -606,6 +624,7 @@ function listenForLeaves() {
         leaves = [];
         snap.forEach(d => leaves.push({ id: d.id, ...d.data() }));
         if (currentRole === 'supervisor') renderSupervisorLeaves();
+        if (currentRole === 'worker') renderWorkerLeaves();
         renderLeaveCalendar();
     });
 }
@@ -654,6 +673,59 @@ window.updateLeaveStatus = async function (leaveId, status) {
         showToast(status === 'approved' ? 'İzin onaylandı.' : 'İzin reddedildi.', status === 'approved' ? 'thumb_up' : 'thumb_down');
     } catch (e) { showToast('Durum güncellenemedi', 'error'); }
 };
+
+window.deleteLeave = async function (leaveId) {
+    if (confirm("Bu izin talebini iptal edip silmek istediğinize emin misiniz?")) {
+        try {
+            await window.deleteDoc(window.doc(window.db, "leaves", leaveId));
+            showToast('İzin talebiniz silindi.', 'delete');
+        } catch (e) { showToast('Silinemedi!', 'error'); }
+    }
+};
+
+function renderWorkerLeaves() {
+    const list = document.getElementById('worker-leaves');
+    if (!list) return;
+
+    // Sadece giriş yapan ustanın (currentUser) izinlerini filtrele
+    const myLeaves = leaves.filter(lv => lv.worker === currentUser);
+
+    if (myLeaves.length === 0) { list.innerHTML = '<div class="empty-state">Henüz bir izin talebiniz bulunmuyor.</div>'; return; }
+    list.innerHTML = '';
+
+    myLeaves.forEach(lv => {
+        const sd = new Date(lv.start).toLocaleDateString('tr-TR');
+        const ed = new Date(lv.end).toLocaleDateString('tr-TR');
+        const statusMap = {
+            pending: { cls: 'pending', label: 'Bekliyor' },
+            approved: { cls: 'completed', label: 'Onaylandı' },
+            rejected: { cls: 'urgent', label: 'Reddedildi' }
+        };
+        const st = statusMap[lv.status] || statusMap.pending;
+
+        // Her durumda silme "İptal Et" butonu olsun mu yoksa sadece beklerken mi?
+        // İsteğe göre "İptal Et (Sil)" butonu ekliyoruz.
+        const actions = `
+            <div class="task-actions" style="margin-top:.8rem">
+                <button class="action-btn danger" onclick="window.deleteLeave('${lv.id}')">
+                    <span class="material-icons-round">delete</span> İptal Et
+                </button>
+            </div>`;
+
+        list.insertAdjacentHTML('beforeend', `
+            <div class="task-card">
+                <div class="task-header">
+                    <div class="task-title"><span class="material-icons-round" style="font-size:1rem;vertical-align:middle">event</span> İzin Talebim</div>
+                </div>
+                <div class="task-chips">
+                    <span class="chip chip-muted"><span class="material-icons-round">date_range</span> ${sd} → ${ed}</span>
+                    <span class="chip chip-${st.cls}">${st.label}</span>
+                </div>
+                ${actions}
+            </div>
+        `);
+    });
+}
 
 let currentCalendarDate = new Date(); // Takvim için şu anki ay
 
