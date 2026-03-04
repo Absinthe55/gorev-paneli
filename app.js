@@ -9,10 +9,12 @@ let currentRole = null;
 let tasks = [];
 let leaves = [];
 let materials = [];
+let documentsList = [];
 let systemUsers = [];
 let unsubscribe = null;
 let leavesUnsubscribe = null;
 let materialsUnsubscribe = null;
+let docsUnsubscribe = null;
 let selectedLoginUser = null;
 let selectedLoginRole = null;
 let currentTaskFilter = 'all';
@@ -55,6 +57,7 @@ const taskImageInput = document.getElementById('task-image');
 const fileNameDisplay = document.getElementById('file-name-display');
 const imagePreview = document.getElementById('image-preview');
 const submitTaskBtn = document.getElementById('submit-task-btn');
+const docsForm = document.getElementById('docs-form');
 
 // Called by the Firebase module script after window.db is ready
 window.appInit = function () { init(); };
@@ -188,6 +191,47 @@ if (materialForm) {
     });
 }
 
+// ─── DOCUMENTS FORM ─────────────────────────────────────────
+
+if (docsForm) {
+    docsForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('submit-doc-btn');
+        const title = document.getElementById('doc-title').value.trim();
+        const fileInput = document.getElementById('doc-file');
+        const file = fileInput.files[0];
+        if (!title || !file) return;
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-icons-round spinning">sync</span> Yükleniyor...';
+
+        try {
+            const fileName = `documents/${Date.now()}_${file.name}`;
+            const storageRef = window.ref(window.storage, fileName);
+            await window.uploadBytes(storageRef, file);
+            const downloadUrl = await window.getDownloadURL(storageRef);
+
+            await window.addDoc(window.collection(window.db, "documents"), {
+                title,
+                url: downloadUrl,
+                uploader: currentUser,
+                timestamp: new Date().toISOString()
+            });
+
+            showToast('Döküman başarıyla yüklendi.', 'cloud_done');
+            docsForm.reset();
+            const docNameEl = document.getElementById('doc-file-name-display');
+            if (docNameEl) docNameEl.textContent = 'Dosya Seç (PDF, Word, Excel, Resim)';
+        } catch (err) {
+            console.error("Döküman yükleme hatası:", err);
+            showToast('Döküman yüklenemedi!', 'error');
+        }
+
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-icons-round">cloud_upload</span> Dökümanı Yükle';
+    });
+}
+
 // ─── LOGOUT ─────────────────────────────────────────────────
 
 logoutBtns.forEach(btn => {
@@ -207,6 +251,19 @@ if (taskImageInput) {
                 imagePreview.style.display = 'block';
             };
             reader.readAsDataURL(file);
+        }
+    });
+}
+
+const docFileInput = document.getElementById('doc-file');
+if (docFileInput) {
+    docFileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        const nameDisplay = document.getElementById('doc-file-name-display');
+        if (file && nameDisplay) {
+            nameDisplay.textContent = file.name;
+        } else if (nameDisplay) {
+            nameDisplay.textContent = 'Dosya Seç (PDF, Word, Excel, Resim)';
         }
     });
 }
@@ -371,6 +428,7 @@ function login(username, role, showWelcome = true) {
     listenForTasks();
     listenForLeaves();
     listenForMaterials();
+    listenForDocuments();
 }
 
 function logout() {
@@ -379,6 +437,7 @@ function logout() {
     if (unsubscribe) { unsubscribe(); unsubscribe = null; }
     if (leavesUnsubscribe) { leavesUnsubscribe(); leavesUnsubscribe = null; }
     if (materialsUnsubscribe) { materialsUnsubscribe(); materialsUnsubscribe = null; }
+    if (docsUnsubscribe) { docsUnsubscribe(); docsUnsubscribe = null; }
     switchScreen('login');
     showToast('Çıkış yapıldı', 'logout');
     fetchUsers(); // Refresh login list
@@ -1186,4 +1245,75 @@ window.stopRadio = function () {
 window.changeRadioVolume = function (val) {
     const audio = document.getElementById('radio-audio-player');
     if (audio) audio.volume = val / 100;
+};
+
+// ─── DOCUMENTS MANAGEMENT ───────────────────────────────────
+
+function listenForDocuments() {
+    if (docsUnsubscribe) docsUnsubscribe();
+    const q = window.query(window.collection(window.db, "documents"), window.orderBy("timestamp", "desc"));
+    docsUnsubscribe = window.onSnapshot(q, (snap) => {
+        documentsList = [];
+        snap.forEach(d => documentsList.push({ id: d.id, ...d.data() }));
+        if (currentRole === 'supervisor') renderSupervisorDocs();
+        renderWorkerDocs();
+    });
+}
+
+function renderSupervisorDocs() {
+    const list = document.getElementById('supervisor-docs');
+    if (!list) return;
+    if (documentsList.length === 0) { list.innerHTML = '<div class="empty-state">Henüz döküman yüklenmemiş.</div>'; return; }
+    list.innerHTML = '';
+    documentsList.forEach(d => {
+        const time = new Date(d.timestamp).toLocaleString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        list.insertAdjacentHTML('beforeend', `
+            <div class="task-card">
+                <div class="task-header">
+                    <div class="task-title"><span class="material-icons-round" style="font-size:1rem;vertical-align:middle;color:var(--clr-primary)">description</span> ${d.title}</div>
+                    <div class="task-time">${time}</div>
+                </div>
+                <div class="task-chips">
+                    <span class="chip chip-muted">Yükleyen: ${d.uploader}</span>
+                </div>
+                <div class="task-actions" style="margin-top:1rem">
+                    <button class="action-btn success" onclick="window.open('${d.url}', '_blank')"><span class="material-icons-round">download</span> Aç / İndir</button>
+                    <button class="action-btn danger" onclick="window.deleteDocument('${d.id}')"><span class="material-icons-round">delete</span> Sil</button>
+                </div>
+            </div>
+        `);
+    });
+}
+
+function renderWorkerDocs() {
+    const list = document.getElementById('worker-docs');
+    if (!list) return;
+    if (documentsList.length === 0) { list.innerHTML = '<div class="empty-state">Henüz döküman yüklenmemiş.</div>'; return; }
+    list.innerHTML = '';
+    documentsList.forEach(d => {
+        const time = new Date(d.timestamp).toLocaleString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        list.insertAdjacentHTML('beforeend', `
+            <div class="task-card">
+                <div class="task-header">
+                    <div class="task-title"><span class="material-icons-round" style="font-size:1rem;vertical-align:middle;color:var(--clr-primary)">description</span> ${d.title}</div>
+                    <div class="task-time">${time}</div>
+                </div>
+                <div class="task-chips">
+                    <span class="chip chip-muted">Yükleyen: ${d.uploader}</span>
+                </div>
+                <div class="task-actions" style="margin-top:1rem">
+                    <button class="action-btn success" onclick="window.open('${d.url}', '_blank')"><span class="material-icons-round">download</span> Aç / İndir</button>
+                </div>
+            </div>
+        `);
+    });
+}
+
+window.deleteDocument = async function (docId) {
+    if (confirm("Bu dökümanı silmek istediğinize emin misiniz?")) {
+        try {
+            await window.deleteDoc(window.doc(window.db, "documents", docId));
+            showToast('Döküman silindi.', 'delete');
+        } catch (e) { showToast('Silinemedi!', 'error'); }
+    }
 };

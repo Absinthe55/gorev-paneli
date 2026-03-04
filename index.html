@@ -193,6 +193,31 @@
                 </section>
             </div>
 
+            <!-- DÖKÜMANLAR SEKMESİ -->
+            <div id="sup-tab-docs" class="tab-content">
+                <section class="glass-panel">
+                    <h3><span class="material-icons-round">folder</span> Döküman Yönetimi</h3>
+                    <form id="docs-form" style="margin-bottom:1rem">
+                        <div class="input-group dark">
+                            <span class="material-icons-round">title</span>
+                            <input type="text" id="doc-title" placeholder="Döküman Adı/Başlığı" required>
+                        </div>
+                        <div class="file-upload-group">
+                            <input type="file" id="doc-file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                                class="file-input" required>
+                            <label for="doc-file" class="file-label" style="justify-content:center">
+                                <span class="material-icons-round">upload_file</span>
+                                <span id="doc-file-name-display">Dosya Seç (PDF, Word, Excel, Resim)</span>
+                            </label>
+                        </div>
+                        <button type="submit" class="btn primary-btn" id="submit-doc-btn">
+                            <span class="material-icons-round">cloud_upload</span> Dökümanı Yükle
+                        </button>
+                    </form>
+                    <div class="task-container" id="supervisor-docs"></div>
+                </section>
+            </div>
+
             <!-- PROFİL / EKİP YÖNETİMİ SEKMESİ -->
             <div id="sup-tab-profile" class="tab-content">
                 <section class="user-management-section glass-panel">
@@ -215,6 +240,9 @@
             </a>
             <a class="nav-item" onclick="window.switchTab('supervisor','materials',this)">
                 <span class="material-icons-round">inventory_2</span><span>Malzeme</span>
+            </a>
+            <a class="nav-item" onclick="window.switchTab('supervisor','docs',this)">
+                <span class="material-icons-round">folder</span><span>Dökümanlar</span>
             </a>
             <a class="nav-item" onclick="window.switchTab('supervisor','profile',this)">
                 <span class="material-icons-round">people</span><span>Ekip</span>
@@ -322,6 +350,14 @@
                     <div class="task-container" id="worker-materials"></div>
                 </section>
             </div>
+
+            <!-- DÖKÜMANLAR SEKMESİ -->
+            <div id="wrk-tab-docs" class="tab-content">
+                <section class="glass-panel">
+                    <h3><span class="material-icons-round">folder</span> Ortak Dökümanlar</h3>
+                    <div class="task-container" id="worker-docs"></div>
+                </section>
+            </div>
         </div>
 
         <nav class="bottom-nav" id="wrk-nav">
@@ -333,6 +369,9 @@
             </a>
             <a class="nav-item" onclick="window.switchTab('worker','materials',this)">
                 <span class="material-icons-round">inventory_2</span><span>Malzeme</span>
+            </a>
+            <a class="nav-item" onclick="window.switchTab('worker','docs',this)">
+                <span class="material-icons-round">folder</span><span>Dökümanlar</span>
             </a>
         </nav>
     </main>
