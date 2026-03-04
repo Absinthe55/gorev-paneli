@@ -216,35 +216,54 @@ if (docsForm) {
             if (file.type === 'application/pdf') {
                 btn.innerHTML = '<span class="material-icons-round spinning">sync</span> PDF sayfaları resme çevriliyor...';
 
-                const arrayBuffer = await file.arrayBuffer();
-                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-                const totalPages = pdf.numPages;
+                try {
+                    const arrayBuffer = await file.arrayBuffer();
+                    console.log("ArrayBuffer loaded, passing to pdf.js...");
+                    const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                    console.log("PDF parsed successfully. Total pages:", pdf.numPages);
+                    const totalPages = pdf.numPages;
 
-                for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-                    btn.innerHTML = `<span class="material-icons-round spinning">sync</span> Sayfa çevriliyor (${pageNum}/${totalPages})...`;
-                    const page = await pdf.getPage(pageNum);
-                    const viewport = page.getViewport({ scale: 1.2 }); // Optimize for Firestore size limit
+                    for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+                        btn.innerHTML = `<span class="material-icons-round spinning">sync</span> Sayfa işleniyor (${pageNum}/${totalPages})...`;
+                        const page = await pdf.getPage(pageNum);
+                        const viewport = page.getViewport({ scale: 1.0 }); // Lower scale to avoid Firestore 1MB doc limit
 
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    canvas.height = viewport.height;
-                    canvas.width = viewport.width;
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        canvas.height = viewport.height;
+                        canvas.width = viewport.width;
 
-                    await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+                        await page.render({ canvasContext: ctx, viewport: viewport }).promise;
 
-                    // Upload directly as Base64 string directly inside Firestore, matching task images
-                    const dataUrl = canvas.toDataURL('image/jpeg', 0.65);
-                    downloadUrls.push(dataUrl);
+                        // Create smaller base64 string
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.50);
+                        downloadUrls.push(dataUrl);
+                        console.log(`Page ${pageNum} rendered and converted to base64. Size: ~${Math.round(dataUrl.length / 1024)}KB`);
+                    }
+                } catch (pdfErr) {
+                    console.error("PDF İşleme Hatası:", pdfErr);
+                    throw new Error("PDF dosyası okunamadı veya bozuk: " + pdfErr.message);
                 }
             } else {
                 // Regular Image 
                 btn.innerHTML = `<span class="material-icons-round spinning">sync</span> Resim işleniyor...`;
-                const dataUrl = await compressImage(file, 1200); // 1200px max width for documents
+                console.log("Compressing standard image...");
+                const dataUrl = await compressImage(file, 1000); // 1000px max width
                 downloadUrls.push(dataUrl);
+                console.log(`Image compressed explicitly. Size: ~${Math.round(dataUrl.length / 1024)}KB`);
             }
 
             console.log("Adding doc to Firestore...");
             btn.innerHTML = '<span class="material-icons-round spinning">sync</span> Sisteme kaydediliyor...';
+
+            // Firestore tek bir dökümanda en fazla 1 MiB saklayabilir. 
+            // Eğer PDF çok sayfalıysa (Örn 10+ sayfa) Base64 stringler toplamı 1MB sınırını aşar ve addDoc donar.
+            let totalSize = downloadUrls.reduce((acc, curr) => acc + curr.length, 0);
+            console.log("Total Firestore Payload Size: ~" + Math.round(totalSize / 1024) + " KB");
+            if (totalSize > 900000) {
+                throw new Error("Dosya boyutu veya sayfa sayısı veritabanı limitini aşıyor. Lütfen daha az sayfalı veya daha düşük boyutlu/çözünürlüklü bir dosya seçin.");
+            }
+
             await Promise.race([
                 window.addDoc(window.collection(window.db, "documents"), {
                     title,
@@ -252,7 +271,7 @@ if (docsForm) {
                     uploader: currentUser,
                     timestamp: new Date().toISOString()
                 }),
-                timeoutPromise(15000)
+                timeoutPromise(10000)
             ]);
 
             showToast('Döküman başarıyla yüklendi.', 'cloud_done');
