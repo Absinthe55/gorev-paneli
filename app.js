@@ -442,7 +442,7 @@ async function requestAndSaveFCMToken(username) {
             // VAPID anahtarınızı Firebase Console'dan Cloud Messaging -> Web Push Certificates altından almalısınız.
             // Bu örnekte oluşturulmuş örnek bir VAPID key gösterilmektedir. Lütfen kendi anahtarınızla değiştirin.
             const currentToken = await window.getToken(window.messaging, {
-                vapidKey: 'BMr0hN_xR2-GvQ8gN-n_tG8_U6lH6B2C8nE3qB5eXNn8vU3E5x8HnC6xM5y_Q5eXG9nX7mG5oK2mV9bN3cJ5k'
+                vapidKey: 'BI1F9WMhb3vIAE-vusJGqpqxam0s9fRE6_Y8eZaA6st3QgsiyDFwZnOryq06BeAvkZ_K5mw4xCqcRIE-JTqUH58'
             });
 
             if (currentToken) {
