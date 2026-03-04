@@ -205,30 +205,61 @@ if (docsForm) {
         btn.disabled = true;
         btn.innerHTML = '<span class="material-icons-round spinning">sync</span> Yükleniyor...';
 
-        try {
-            const fileName = `documents/${Date.now()}_${file.name}`;
-            const storageRef = window.ref(window.storage, fileName);
-            await window.uploadBytes(storageRef, file);
-            const downloadUrl = await window.getDownloadURL(storageRef);
+        const timeoutPromise = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error("İşlem zaman aşımına uğradı (Bağlantı veya Yetki sorunu).")), ms));
 
-            await window.addDoc(window.collection(window.db, "documents"), {
-                title,
-                url: downloadUrl,
-                uploader: currentUser,
-                timestamp: new Date().toISOString()
-            });
+        try {
+            console.log("Documents upload started for:", file.name);
+            const fileName = `documents/${Date.now()}_${file.name}`;
+
+            if (!window.storage || !window.ref || !window.uploadBytes || !window.getDownloadURL) {
+                throw new Error("Firebase Storage bağlantısı kurulamadı. index.html eksik olabilir.");
+            }
+
+            const storageRef = window.ref(window.storage, fileName);
+
+            // Upload to storage with 30s timeout
+            console.log("Uploading bytes to Firebase...");
+            await Promise.race([
+                window.uploadBytes(storageRef, file),
+                timeoutPromise(30000)
+            ]);
+
+            console.log("Getting download URL...");
+            const downloadUrl = await Promise.race([
+                window.getDownloadURL(storageRef),
+                timeoutPromise(10000)
+            ]);
+
+            console.log("Adding doc to Firestore...");
+            await Promise.race([
+                window.addDoc(window.collection(window.db, "documents"), {
+                    title,
+                    url: downloadUrl,
+                    uploader: currentUser,
+                    timestamp: new Date().toISOString()
+                }),
+                timeoutPromise(15000)
+            ]);
 
             showToast('Döküman başarıyla yüklendi.', 'cloud_done');
             docsForm.reset();
             const docNameEl = document.getElementById('doc-file-name-display');
             if (docNameEl) docNameEl.textContent = 'Dosya Seç (PDF, Word, Excel, Resim)';
         } catch (err) {
-            console.error("Döküman yükleme hatası:", err);
-            showToast('Döküman yüklenemedi!', 'error');
+            console.error("Döküman yükleme hatası detayları:", err);
+            // Firebase Storage kuralları veya kapalı olması gibi durumlarda hatayı gösterelim
+            let errMsg = 'Döküman yüklenemedi!';
+            if (err.message && err.message.includes("zaman aşımına")) {
+                errMsg = 'Firebase bağlantısı koptu veya Storage kapalı.';
+                alert("Hata: Firebase Storage henüz projenizde aktif edilmemiş olabilir veya bağlantınız yavaş. Lütfen Firebase Console üzerinden Build > Storage bölümüne girip servisi başlattığınızdan emin olun.");
+            } else if (err.code && err.code.includes("unauthorized")) {
+                alert("Hata: Firebase Storage güvenlik kuralları izinsiz (unauthorized) yüklemeye izin vermiyor. Firebase Console > Storage > Rules bölümünde allow write izni vermelisiniz.");
+            }
+            showToast(errMsg, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<span class="material-icons-round">cloud_upload</span> Dökümanı Yükle';
         }
-
-        btn.disabled = false;
-        btn.innerHTML = '<span class="material-icons-round">cloud_upload</span> Dökümanı Yükle';
     });
 }
 
