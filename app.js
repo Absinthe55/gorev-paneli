@@ -331,6 +331,35 @@ async function fetchUsers() {
     }
 }
 
+function attachUserListListeners() {
+    const userCards = document.querySelectorAll('.login-card-user');
+    userCards.forEach(card => {
+        card.addEventListener('click', () => {
+            // Unselect all
+            document.querySelectorAll('.login-card-group').forEach(c => c.classList.remove('selected'));
+            document.querySelectorAll('.inline-password-form').forEach(f => {
+                f.style.display = 'none';
+            });
+
+            // Select this one
+            const group = card.closest('.login-card-group');
+            group.classList.add('selected');
+
+            // Show password form for this user
+            const pForm = group.querySelector('.inline-password-form');
+            pForm.style.display = 'flex';
+
+            // Focus the password input
+            setTimeout(() => {
+                pForm.querySelector('.inline-password-input').focus();
+            }, 50);
+
+            selectedLoginUser = card.getAttribute('data-name');
+            selectedLoginRole = card.getAttribute('data-role');
+        });
+    });
+}
+
 function login(username, role, showWelcome = true) {
     currentUser = username;
     currentRole = role;
@@ -781,26 +810,17 @@ window.updateLeaveStatus = async function (leaveId, status) {
 };
 
 window.deleteLeave = async function (leaveId) {
-<<<<<<< HEAD
     if (confirm("Bu izin talebini iptal edip silmek istediğinize emin misiniz?")) {
         try {
             await window.deleteDoc(window.doc(window.db, "leaves", leaveId));
             showToast('İzin talebiniz silindi.', 'delete');
         } catch (e) { showToast('Silinemedi!', 'error'); }
-=======
-    if (confirm("Bu izin talebini silmek istediğinize emin misiniz?")) {
-        try {
-            await window.deleteDoc(window.doc(window.db, "leaves", leaveId));
-            showToast('İzin silindi.', 'delete');
-        } catch (e) { showToast('Silinemedi.', 'error'); }
->>>>>>> 8d1a93702c147d94d8bb7a359598280a53e69e92
     }
 };
 
 function renderWorkerLeaves() {
     const list = document.getElementById('worker-leaves');
     if (!list) return;
-<<<<<<< HEAD
 
     // Sadece giriş yapan ustanın (currentUser) izinlerini filtrele
     const myLeaves = leaves.filter(lv => lv.worker === currentUser);
@@ -808,18 +828,12 @@ function renderWorkerLeaves() {
     if (myLeaves.length === 0) { list.innerHTML = '<div class="empty-state">Henüz bir izin talebiniz bulunmuyor.</div>'; return; }
     list.innerHTML = '';
 
-=======
-    const myLeaves = leaves.filter(l => l.worker === currentUser);
-    if (myLeaves.length === 0) { list.innerHTML = '<div class="empty-state">Henüz izin talebiniz yok.</div>'; return; }
-    list.innerHTML = '';
->>>>>>> 8d1a93702c147d94d8bb7a359598280a53e69e92
     myLeaves.forEach(lv => {
         const sd = new Date(lv.start).toLocaleDateString('tr-TR');
         const ed = new Date(lv.end).toLocaleDateString('tr-TR');
         const statusMap = {
             pending: { cls: 'pending', label: 'Bekliyor' },
             approved: { cls: 'completed', label: 'Onaylandı' },
-<<<<<<< HEAD
             rejected: { cls: 'urgent', label: 'Reddedildi' }
         };
         const st = statusMap[lv.status] || statusMap.pending;
@@ -843,28 +857,6 @@ function renderWorkerLeaves() {
                     <span class="chip chip-${st.cls}">${st.label}</span>
                 </div>
                 ${actions}
-=======
-            rejected: { cls: 'urgent', label: 'Reddedildi' },
-            cancelled: { cls: 'danger', label: 'İptal Edildi' }
-        };
-        const st = statusMap[lv.status] || statusMap.pending;
-
-        let actionsHtml = '';
-        if (lv.status === 'pending' || lv.status === 'approved') {
-            actionsHtml += `<button class="action-btn danger" onclick="window.updateLeaveStatus('${lv.id}','cancelled')"><span class="material-icons-round">cancel</span> İptal Et</button>`;
-        }
-        actionsHtml += `<button class="action-btn danger" onclick="window.deleteLeave('${lv.id}')"><span class="material-icons-round">delete</span> Sil</button>`;
-
-        list.insertAdjacentHTML('beforeend', `
-            <div class="task-card" onclick="window.toggleTaskCard(this, event)">
-                <div class="task-chips" style="margin-top: 0;">
-                    <span class="chip chip-muted"><span class="material-icons-round">date_range</span> ${sd} → ${ed}</span>
-                    <span class="chip chip-${st.cls}">${st.label}</span>
-                </div>
-                <div class="task-actions" style="gap:.5rem;margin-top:.8rem">
-                    ${actionsHtml}
-                </div>
->>>>>>> 8d1a93702c147d94d8bb7a359598280a53e69e92
             </div>
         `);
     });
@@ -909,12 +901,12 @@ function renderLeaveCalendar() {
         // Hafta günleri başlıkları
         const weekdays = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
         weekdays.forEach(day => {
-            gridEl.insertAdjacentHTML('beforeend', `<div class="calendar-weekday">${day}</div>`);
+            gridEl.insertAdjacentHTML('beforeend', `< div class= "calendar-weekday" > ${day}</div > `);
         });
 
         // Bos kutucuklar (Ayın ilk gününden önceki günler)
         for (let i = 1; i < startDayOfWeek; i++) {
-            gridEl.insertAdjacentHTML('beforeend', `<div class="calendar-day empty"></div>`);
+            gridEl.insertAdjacentHTML('beforeend', `< div class= "calendar-day empty" ></div > `);
         }
 
         // Günleri oluştur
@@ -931,14 +923,14 @@ function renderLeaveCalendar() {
 
             // İzin rozetlerini oluştur
             const badgesHtml = leavesToday.map(l =>
-                `<div class="leave-badge ${l.status === 'pending' ? 'pending' : ''}" title="${l.worker}">${l.worker.split(' ')[0]}</div>`
+                `< div class= "leave-badge ${l.status === 'pending' ? 'pending' : ''}" title = "${l.worker}" > ${l.worker.split(' ')[0]}</div > `
             ).join('');
 
             gridEl.insertAdjacentHTML('beforeend', `
-                <div class="calendar-day">
-                    <div class="cd-num">${i}</div>
+        < div class= "calendar-day" >
+        <div class="cd-num">${i}</div>
                     ${badgesHtml}
-                </div>
+                </div >
             `);
         }
     });
@@ -971,11 +963,11 @@ function renderSupervisorMaterials() {
         };
         const st = statusMap[m.status] || statusMap.pending;
         const commentsHtml = (m.comments || []).map(c =>
-            `<div class="comment ${c.role}"><strong>${c.author}:</strong> ${c.text}</div>`
+            `< div class= "comment ${c.role}" > <strong>${c.author}:</strong> ${c.text}</div > `
         ).join('');
-        const imageHtml = m.imageUrl ? `<div class="task-img-wrap" style="display:block;opacity:1"><img src="${m.imageUrl}" loading="lazy" onclick="openImageModal('${m.imageUrl}', event)"></div>` : '';
+        const imageHtml = m.imageUrl ? `< div class= "task-img-wrap" style = "display:block;opacity:1" > <img src="${m.imageUrl}" loading="lazy" onclick="openImageModal('${m.imageUrl}', event)"></div>` : '';
         list.insertAdjacentHTML('beforeend', `
-            <div class="task-card" onclick="window.toggleTaskCard(this, event)">
+        < div class= "task-card" onclick = "window.toggleTaskCard(this, event)" >
                 <div class="task-header">
                     <div class="task-title"><span class="material-icons-round" style="font-size:1rem;vertical-align:middle">inventory_2</span> ${m.name}</div>
                 </div>
@@ -985,7 +977,7 @@ function renderSupervisorMaterials() {
                 </div>
                 ${m.desc ? `<p class="mat-desc">${m.desc}</p>` : ''}
                 ${imageHtml}
-                <div class="comments-section">${commentsHtml}</div>
+        < div class= "comments-section" > ${commentsHtml}</div >
                 <div class="comment-form" onclick="event.stopPropagation()">
                     <input type="text" class="comment-input" id="mc-${m.id}" placeholder="Yorum ekle...">
                     <button class="action-btn" onclick="window.addComment('${m.id}')"><span class="material-icons-round">send</span></button>
@@ -997,8 +989,8 @@ function renderSupervisorMaterials() {
                     ` : ''}
                     <button class="action-btn danger" onclick="window.deleteMaterial('${m.id}')"><span class="material-icons-round">delete</span> Sil</button>
                 </div>
-            </div>
-        `);
+            </div >
+            `);
     });
 }
 
@@ -1017,11 +1009,11 @@ function renderWorkerMaterials() {
         };
         const st = statusMap[m.status] || statusMap.pending;
         const commentsHtml = (m.comments || []).map(c =>
-            `<div class="comment ${c.role}"><strong>${c.author}:</strong> ${c.text}</div>`
+            `< div class= "comment ${c.role}" > <strong>${c.author}:</strong> ${c.text}</div > `
         ).join('');
-        const imageHtml = m.imageUrl ? `<div class="task-img-wrap" style="display:block;opacity:1"><img src="${m.imageUrl}" loading="lazy" onclick="openImageModal('${m.imageUrl}', event)"></div>` : '';
+        const imageHtml = m.imageUrl ? `< div class= "task-img-wrap" style = "display:block;opacity:1" > <img src="${m.imageUrl}" loading="lazy" onclick="openImageModal('${m.imageUrl}', event)"></div>` : '';
         list.insertAdjacentHTML('beforeend', `
-            <div class="task-card" onclick="window.toggleTaskCard(this, event)">
+        < div class= "task-card" onclick = "window.toggleTaskCard(this, event)" >
                 <div class="task-header">
                     <div class="task-title">${m.name}</div>
                 </div>
@@ -1030,18 +1022,18 @@ function renderWorkerMaterials() {
                 </div>
                 ${m.desc ? `<p class="mat-desc">${m.desc}</p>` : ''}
                 ${imageHtml}
-                <div class="comments-section">${commentsHtml}</div>
-                <div class="comment-form" onclick="event.stopPropagation()">
-                    <input type="text" class="comment-input" id="mc-${m.id}" placeholder="Yorum ekle...">
-                    <button class="action-btn" onclick="window.addComment('${m.id}')"><span class="material-icons-round">send</span></button>
-                </div>
-            </div>
-        `);
+        < div class= "comments-section" > ${commentsHtml}</div >
+        <div class="comment-form" onclick="event.stopPropagation()">
+            <input type="text" class="comment-input" id="mc-${m.id}" placeholder="Yorum ekle...">
+                <button class="action-btn" onclick="window.addComment('${m.id}')"><span class="material-icons-round">send</span></button>
+        </div>
+            </div >
+            `);
     });
 }
 
 window.addComment = async function (materialId) {
-    const input = document.getElementById(`mc-${materialId}`);
+    const input = document.getElementById(`mc - ${materialId}`);
     if (!input || !input.value.trim()) return;
     try {
         const mat = materials.find(m => m.id === materialId);
@@ -1090,17 +1082,17 @@ function renderSystemUsers() {
             const roleIcon = u.role === 'supervisor' ? 'admin_panel_settings' : 'engineering';
             const roleLabel = u.role === 'supervisor' ? 'Amir' : 'Usta';
             list.insertAdjacentHTML('beforeend', `
-                <div class="task-card" style="display:flex;justify-content:space-between;align-items:center;padding:.9rem;margin-bottom:.5rem">
-                    <div>
-                        <div style="font-weight:600;font-size:1rem">${u.name}</div>
-                        <div style="margin-top:.3rem;font-size:.82rem;color:var(--clr-text-muted);display:flex;align-items:center;gap:.4rem">
-                            <span class="material-icons-round" style="font-size:.9rem">${roleIcon}</span> ${roleLabel}
-                            &nbsp;|&nbsp; Şifre:
-                            <span style="font-family:monospace;background:rgba(255,255,255,.08);padding:.1rem .4rem;border-radius:4px">${u.password}</span>
-                            <span class="material-icons-round" style="font-size:1rem;cursor:pointer;color:var(--clr-primary)" onclick="window.promptEditPassword('${u.id}','${u.name}')" title="Şifreyi Değiştir">edit</span>
-                        </div>
-                    </div>
-                </div>
+        <div class="task-card" style="display:flex;justify-content:space-between;align-items:center;padding:.9rem;margin-bottom:.5rem">
+        <div>
+            <div style="font-weight:600;font-size:1rem">${u.name}</div>
+            <div style="margin-top:.3rem;font-size:.82rem;color:var(--clr-text-muted);display:flex;align-items:center;gap:.4rem">
+                <span class="material-icons-round" style="font-size:.9rem">${roleIcon}</span> ${roleLabel}
+                &nbsp;|&nbsp; Şifre:
+                <span style="font-family:monospace;background:rgba(255,255,255,.08);padding:.1rem .4rem;border-radius:4px">${u.password}</span>
+                <span class="material-icons-round" style="font-size:1rem;cursor:pointer;color:var(--clr-primary)" onclick="window.promptEditPassword('${u.id}','${u.name}')" title="Şifreyi Değiştir">edit</span>
+            </div>
+        </div>
+        </div>
             `);
         });
     });
@@ -1122,7 +1114,7 @@ window.promptAddUser = async function () {
 };
 
 window.promptEditPassword = async function (userId, userName) {
-    const pw = prompt(`${userName} için yeni şifre:`);
+    const pw = prompt(`${userName} için yeni şifre: `);
     if (pw && pw.trim()) {
         try {
             await window.updateDoc(window.doc(window.db, "users", userId), { password: pw.trim() });
@@ -1137,7 +1129,7 @@ window.promptDeleteUser = async function () {
     if (!name || !name.trim()) return;
     const user = systemUsers.find(u => u.name.toLowerCase() === name.trim().toLowerCase());
     if (user) {
-        if (confirm(`${user.name} silinecek. Onaylıyor musunuz?`)) {
+        if (confirm(`${user.name} silinecek.Onaylıyor musunuz ? `)) {
             try {
                 await window.deleteDoc(window.doc(window.db, "users", user.id));
                 showToast('Personel silindi.', 'person_remove');
@@ -1153,7 +1145,7 @@ function showToast(message, icon) {
     if (!toastContainer) return;
     const t = document.createElement('div');
     t.className = 'toast';
-    t.innerHTML = `<span class="material-icons-round">${icon || 'info'}</span>${message}`;
+    t.innerHTML = `< span class= "material-icons-round" > ${icon || 'info'}</span > ${message}`;
     toastContainer.appendChild(t);
     setTimeout(() => { t.style.animation = 'toastLeave 0.3s forwards'; setTimeout(() => t.remove(), 300); }, 3000);
 }
