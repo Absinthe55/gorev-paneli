@@ -302,30 +302,8 @@ logoutBtns.forEach(btn => {
     btn.addEventListener('click', logout);
 });
 
-// ─── IMAGE PREVIEW & MODAL ──────────────────────────────────
+// ─── IMAGE PREVIEW ──────────────────────────────────────────
 
-window.openImageModal = function (src, event) {
-    if (event) event.stopPropagation();
-    const modal = document.getElementById('image-modal');
-    const img = document.getElementById('image-modal-img');
-    if (modal && img) {
-        img.src = src;
-        modal.classList.add('open');
-    }
-};
-
-window.closeImageModal = function () {
-    const modal = document.getElementById('image-modal');
-    const img = document.getElementById('image-modal-img');
-    if (modal && img) {
-        modal.classList.remove('open');
-        setTimeout(() => { img.src = ''; }, 300); // Wait for transition
-    }
-};
-
-window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') window.closeImageModal();
-});
 if (taskImageInput) {
     taskImageInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
@@ -817,14 +795,22 @@ window.openImageModal = function (url, event) {
     const img = document.getElementById('image-modal-img');
     if (modal && img) {
         img.src = url;
-        modal.classList.add('active');
+        modal.classList.add('open'); // CSS now uses .open
     }
 };
 
 window.closeImageModal = function () {
     const modal = document.getElementById('image-modal');
-    if (modal) modal.classList.remove('active');
+    const img = document.getElementById('image-modal-img');
+    if (modal) {
+        modal.classList.remove('open'); // CSS now uses .open
+        if (img) setTimeout(() => { img.src = ''; }, 300);
+    }
 };
+
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') window.closeImageModal();
+});
 
 // ─── LEAVE FUNCTIONS ────────────────────────────────────────
 
@@ -1355,7 +1341,7 @@ function renderSupervisorDocs() {
         const time = new Date(d.timestamp).toLocaleString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
         const pagesCount = d.urls ? d.urls.length : (d.url ? 1 : 0);
         list.insertAdjacentHTML('beforeend', `
-            <div class="task-card">
+            <div class="task-card" onclick="window.toggleTaskCard(this, event)">
                 <div class="task-header">
                     <div class="task-title"><span class="material-icons-round" style="font-size:1rem;vertical-align:middle;color:var(--clr-primary)">description</span> ${d.title}</div>
                     <div class="task-time">${time}</div>
@@ -1368,7 +1354,7 @@ function renderSupervisorDocs() {
                     <button class="action-btn success" onclick="window.viewDocumentGallery('${d.id}')"><span class="material-icons-round">visibility</span> İncele</button>
                     <button class="action-btn danger" onclick="window.deleteDocument('${d.id}')"><span class="material-icons-round">delete</span> Sil</button>
                 </div>
-                <div id="doc-gallery-${d.id}" class="doc-gallery" style="display:none; margin-top:1rem; border-top:1px solid rgba(255,255,255,0.1); padding-top:1rem;">
+                <div id="doc-gallery-${d.id}" class="doc-gallery" style="display:none; margin-top:1rem; border-top:1px solid rgba(255,255,255,0.1); padding-top:1rem;" onclick="event.stopPropagation()">
                 </div>
             </div>
         `);
@@ -1384,7 +1370,7 @@ function renderWorkerDocs() {
         const time = new Date(d.timestamp).toLocaleString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
         const pagesCount = d.urls ? d.urls.length : (d.url ? 1 : 0);
         list.insertAdjacentHTML('beforeend', `
-            <div class="task-card">
+            <div class="task-card" onclick="window.toggleTaskCard(this, event)">
                 <div class="task-header">
                     <div class="task-title"><span class="material-icons-round" style="font-size:1rem;vertical-align:middle;color:var(--clr-primary)">description</span> ${d.title}</div>
                     <div class="task-time">${time}</div>
@@ -1396,7 +1382,7 @@ function renderWorkerDocs() {
                 <div class="task-actions" style="margin-top:1rem">
                     <button class="action-btn success" onclick="window.viewDocumentGallery('${d.id}')"><span class="material-icons-round">visibility</span> İncele</button>
                 </div>
-                <div id="doc-gallery-${d.id}" class="doc-gallery" style="display:none; margin-top:1rem; border-top:1px solid rgba(255,255,255,0.1); padding-top:1rem;">
+                <div id="doc-gallery-${d.id}" class="doc-gallery" style="display:none; margin-top:1rem; border-top:1px solid rgba(255,255,255,0.1); padding-top:1rem;" onclick="event.stopPropagation()">
                 </div>
             </div>
         `);
