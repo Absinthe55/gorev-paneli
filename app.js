@@ -302,8 +302,30 @@ logoutBtns.forEach(btn => {
     btn.addEventListener('click', logout);
 });
 
-// ─── IMAGE PREVIEW ──────────────────────────────────────────
+// ─── IMAGE PREVIEW & MODAL ──────────────────────────────────
 
+window.openImageModal = function (src, event) {
+    if (event) event.stopPropagation();
+    const modal = document.getElementById('image-modal');
+    const img = document.getElementById('image-modal-img');
+    if (modal && img) {
+        img.src = src;
+        modal.classList.add('open');
+    }
+};
+
+window.closeImageModal = function () {
+    const modal = document.getElementById('image-modal');
+    const img = document.getElementById('image-modal-img');
+    if (modal && img) {
+        modal.classList.remove('open');
+        setTimeout(() => { img.src = ''; }, 300); // Wait for transition
+    }
+};
+
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') window.closeImageModal();
+});
 if (taskImageInput) {
     taskImageInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
