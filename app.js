@@ -106,8 +106,8 @@ function handleInlineLogin(userName, userRole, btnElement) {
 //      (bota /start yazdıktan sonra https://api.telegram.org/bot<TOKEN>/getUpdates
 //       adresinden "chat":{"id": ... } alanından öğrenebilirsiniz)
 
-const TELEGRAM_BOT_TOKEN = 'BURAYA_BOT_TOKEN_GIRIN';
-const SUPERVISOR_CHAT_ID = 'BURAYA_CHAT_ID_GIRIN';
+const TELEGRAM_BOT_TOKEN = '8510730673:AAFQPairc0cKhxzIEL_0hCmS-fxj84lm72U';
+const SUPERVISOR_CHAT_ID = '8192869692';
 
 async function sendTelegramNotification(chatId, message) {
     if (!chatId || !TELEGRAM_BOT_TOKEN ||
