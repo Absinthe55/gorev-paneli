@@ -699,6 +699,12 @@ function renderTasks() {
     else if (currentRole === 'worker') { renderWorkerTasks(); }
 }
 
+// Tamamlananları listenin sonuna it; bekliyor/devam edenler başta kalsın
+function sortByStatus(items) {
+    const order = { pending: 0, progress: 1, approved: 2, resolved: 2, rejected: 2, completed: 3, cancelled: 3 };
+    return [...items].sort((a, b) => (order[a.status] ?? 1) - (order[b.status] ?? 1));
+}
+
 function updateStats() {
     const c = { pending: 0, progress: 0, completed: 0 };
     tasks.forEach(t => { if (c[t.status] !== undefined) c[t.status]++; });
@@ -726,7 +732,8 @@ window.filterWorkerTasks = function (filter, btn) {
 
 function renderSupervisorTasks() {
     if (!supervisorTasks) return;
-    const filtered = currentTaskFilter === 'all' ? tasks : tasks.filter(t => t.status === currentTaskFilter);
+    const base = currentTaskFilter === 'all' ? tasks : tasks.filter(t => t.status === currentTaskFilter);
+    const filtered = currentTaskFilter === 'all' ? sortByStatus(base) : base;
 
     if (filtered.length === 0) {
         supervisorTasks.innerHTML = `<div class="empty-state"><span class="material-icons-round" style="font-size:3rem;opacity:.3">assignment</span><p>Bu filtrede görev yok.</p></div>`;
@@ -775,7 +782,8 @@ function renderSupervisorTasks() {
 function renderWorkerTasks() {
     if (!workerTasks) return;
     const myTasks = tasks.filter(t => t.worker === currentUser);
-    const filtered = currentWorkerTaskFilter === 'all' ? myTasks : myTasks.filter(t => t.status === currentWorkerTaskFilter);
+    const base = currentWorkerTaskFilter === 'all' ? myTasks : myTasks.filter(t => t.status === currentWorkerTaskFilter);
+    const filtered = currentWorkerTaskFilter === 'all' ? sortByStatus(base) : base;
 
     if (filtered.length === 0) {
         workerTasks.innerHTML = `<div class="empty-state"><span class="material-icons-round" style="font-size:3rem;opacity:.3">assignment</span><p>Bu filtrede görev yok.</p></div>`;
@@ -1150,7 +1158,7 @@ function renderSupervisorMaterials() {
     if (!list) return;
     if (materials.length === 0) { list.innerHTML = '<div class="empty-state">Malzeme talebi yok.</div>'; return; }
     list.innerHTML = '';
-    materials.forEach(m => {
+    sortByStatus(materials).forEach(m => {
         const statusMap = {
             pending: { cls: 'pending', label: 'Bekliyor' },
             resolved: { cls: 'completed', label: 'Çözüldü' }, // Eski kayıtlar için
@@ -1200,7 +1208,7 @@ function renderSupervisorMaterials() {
 function renderWorkerMaterials() {
     const list = document.getElementById('worker-materials');
     if (!list) return;
-    const myMats = materials.filter(m => m.worker === currentUser);
+    const myMats = sortByStatus(materials.filter(m => m.worker === currentUser));
     if (myMats.length === 0) { list.innerHTML = '<div class="empty-state">Henüz malzeme talebiniz yok.</div>'; return; }
     list.innerHTML = '';
     myMats.forEach(m => {
@@ -1512,7 +1520,7 @@ function renderSupervisorDocs() {
         const time = new Date(d.timestamp).toLocaleString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
         const pagesCount = d.urls ? d.urls.length : (d.url ? 1 : 0);
         list.insertAdjacentHTML('beforeend', `
-            <div class="task-card" onclick="window.toggleTaskCard(this, event)">
+            <div class="task-card doc-card">
                 <div class="task-header">
                     <div class="task-title"><span class="material-icons-round" style="font-size:1rem;vertical-align:middle;color:var(--clr-primary)">description</span> ${d.title}</div>
                     <div class="task-time">${time}</div>
@@ -1525,7 +1533,7 @@ function renderSupervisorDocs() {
                     <button class="action-btn success" onclick="window.viewDocumentGallery('${d.id}')"><span class="material-icons-round">visibility</span> İncele</button>
                     <button class="action-btn danger" onclick="window.deleteDocument('${d.id}')"><span class="material-icons-round">delete</span> Sil</button>
                 </div>
-                <div id="doc-gallery-${d.id}" class="doc-gallery" style="display:none; margin-top:1rem; border-top:1px solid rgba(255,255,255,0.1); padding-top:1rem;" onclick="event.stopPropagation()">
+                <div id="doc-gallery-${d.id}" class="doc-gallery" style="display:none; margin-top:1rem; border-top:1px solid rgba(255,255,255,0.1); padding-top:1rem;">
                 </div>
             </div>
         `);
@@ -1541,7 +1549,7 @@ function renderWorkerDocs() {
         const time = new Date(d.timestamp).toLocaleString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
         const pagesCount = d.urls ? d.urls.length : (d.url ? 1 : 0);
         list.insertAdjacentHTML('beforeend', `
-            <div class="task-card" onclick="window.toggleTaskCard(this, event)">
+            <div class="task-card doc-card">
                 <div class="task-header">
                     <div class="task-title"><span class="material-icons-round" style="font-size:1rem;vertical-align:middle;color:var(--clr-primary)">description</span> ${d.title}</div>
                     <div class="task-time">${time}</div>
@@ -1553,7 +1561,7 @@ function renderWorkerDocs() {
                 <div class="task-actions" style="margin-top:1rem">
                     <button class="action-btn success" onclick="window.viewDocumentGallery('${d.id}')"><span class="material-icons-round">visibility</span> İncele</button>
                 </div>
-                <div id="doc-gallery-${d.id}" class="doc-gallery" style="display:none; margin-top:1rem; border-top:1px solid rgba(255,255,255,0.1); padding-top:1rem;" onclick="event.stopPropagation()">
+                <div id="doc-gallery-${d.id}" class="doc-gallery" style="display:none; margin-top:1rem; border-top:1px solid rgba(255,255,255,0.1); padding-top:1rem;">
                 </div>
             </div>
         `);

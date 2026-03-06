@@ -1060,6 +1060,16 @@ input[type="date"] {
     animation: fadeIn 0.3s ease forwards;
 }
 
+/* Döküman kartları: İncele butonu ve galeri her zaman görünür */
+.task-card.doc-card .task-actions {
+    display: block;
+    opacity: 1;
+}
+
+.doc-gallery {
+    overflow: hidden;
+}
+
 /* ── IMAGE MODAL ─────────────────────────────────────── */
 .image-modal {
     position: fixed;
