@@ -1230,8 +1230,8 @@ function renderWorkerMaterials() {
         }).join('');
         const imageHtml = m.imageUrl ? `<div class="task-img-wrap"><img src="${m.imageUrl}" loading="lazy" onclick="openImageModal('${m.imageUrl}', event)"></div>` : '';
         const selfApproveHtml = m.status === 'pending' ? `
-        <div class="task-actions" style="margin-top:.5rem" onclick="event.stopPropagation()">
-            <button class="action-btn success" onclick="window.workerSelfApproveMaterial('${m.id}')">
+        <div style="margin-top:.6rem" onclick="event.stopPropagation()">
+            <button class="action-btn success" style="width:100%;" onclick="window.workerSelfApproveMaterial('${m.id}')">
                 <span class="material-icons-round">check_circle</span> Onayla (Temin Ettim)
             </button>
         </div>` : '';
