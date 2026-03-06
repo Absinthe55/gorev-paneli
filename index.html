@@ -357,6 +357,40 @@
                     <div class="task-container" id="worker-docs"></div>
                 </section>
             </div>
+
+            <!-- TELEGRAM AYARLARI SEKMESİ -->
+            <div id="wrk-tab-telegram" class="tab-content">
+                <section class="glass-panel">
+                    <h3><span class="material-icons-round">send</span> Telegram Bildirimleri</h3>
+                    <p class="section-desc" style="margin-bottom:1rem">Görev atamalarından ve izin kararlarından anında haberdar olun. Telegram Chat ID'nizi girerek bildirimleri etkinleştirin.</p>
+
+                    <div style="background:rgba(255,255,255,.06);border-radius:12px;padding:1rem;margin-bottom:1rem;font-size:.87rem;line-height:1.6">
+                        <div style="font-weight:600;margin-bottom:.5rem">📲 Nasıl Kurulur?</div>
+                        <ol style="padding-left:1.2rem;color:var(--clr-text-muted)">
+                            <li>Telegram'da oluşturulan botu bulun ve <code>/start</code> yazın</li>
+                            <li>Size gelen yanıttaki <strong style="color:var(--clr-primary)">Chat ID</strong>'yi aşağıya girin</li>
+                            <li>Kaydet butonuna basın — artık bildirim alacaksınız! 🎉</li>
+                        </ol>
+                        <div style="margin-top:.6rem;padding:.5rem .7rem;background:rgba(59,130,246,.1);border-radius:8px;font-size:.8rem;color:var(--clr-text-muted)">
+                            💡 Chat ID'nizi bilmiyorsanız: Bota <code>/start</code> yazın, ya da <a href="https://t.me/userinfobot" target="_blank" style="color:var(--clr-primary)">@userinfobot</a>'a mesaj gönderin.
+                        </div>
+                    </div>
+
+                    <div class="task-card" style="padding:1rem" id="wrk-telegram-card">
+                        <div style="font-size:.85rem;color:var(--clr-text-muted);margin-bottom:.6rem;display:flex;align-items:center;gap:.4rem">
+                            <span class="material-icons-round" style="font-size:1rem">account_circle</span> Telegram Chat ID'niz
+                        </div>
+                        <div style="display:flex;gap:.5rem;align-items:center">
+                            <input type="text" id="wrk-tg-chat-id" placeholder="Örn: 123456789"
+                                style="flex:1;padding:.5rem .8rem;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.07);color:inherit;font-size:.9rem">
+                            <button class="btn primary-btn" style="white-space:nowrap;padding:.5rem 1rem" onclick="window.saveWorkerTelegramId()">
+                                <span class="material-icons-round">save</span> Kaydet
+                            </button>
+                        </div>
+                        <div id="wrk-tg-status" style="margin-top:.6rem;font-size:.8rem"></div>
+                    </div>
+                </section>
+            </div>
         </div>
 
         <nav class="bottom-nav" id="wrk-nav">
@@ -371,6 +405,9 @@
             </a>
             <a class="nav-item" onclick="window.switchTab('worker','docs',this)">
                 <span class="material-icons-round">folder</span><span>Dökümanlar</span>
+            </a>
+            <a class="nav-item" onclick="window.switchTab('worker','telegram',this)">
+                <span class="material-icons-round">send</span><span>Bildirim</span>
             </a>
         </nav>
     </main>

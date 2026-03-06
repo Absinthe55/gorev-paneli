@@ -99,6 +99,64 @@ function handleInlineLogin(userName, userRole, btnElement) {
     btnElement.innerHTML = 'Giriş <span class="material-icons-round" style="font-size:1rem;margin-left:2px">arrow_forward</span>';
 }
 
+// ─── TELEGRAM BİLDİRİM SİSTEMİ ─────────────────────────────
+// ⚠️  Aşağıdaki iki değişkeni doldurun:
+//   1) TELEGRAM_BOT_TOKEN : @BotFather'dan aldığınız bot token
+//   2) SUPERVISOR_CHAT_ID : Sizin kişisel Telegram Chat ID'niz
+//      (bota /start yazdıktan sonra https://api.telegram.org/bot<TOKEN>/getUpdates
+//       adresinden "chat":{"id": ... } alanından öğrenebilirsiniz)
+
+const TELEGRAM_BOT_TOKEN = 'BURAYA_BOT_TOKEN_GIRIN';
+const SUPERVISOR_CHAT_ID = 'BURAYA_CHAT_ID_GIRIN';
+
+async function sendTelegramNotification(chatId, message) {
+    if (!chatId || !TELEGRAM_BOT_TOKEN ||
+        TELEGRAM_BOT_TOKEN === 'BURAYA_BOT_TOKEN_GIRIN' ||
+        String(chatId) === 'BURAYA_CHAT_ID_GIRIN') return;
+    try {
+        await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: chatId, text: message, parse_mode: 'HTML' })
+        });
+    } catch (e) {
+        console.warn('Telegram bildirimi gönderilemedi:', e);
+    }
+}
+
+function getWorkerChatId(workerName) {
+    const user = systemUsers.find(u => u.name === workerName);
+    return user && user.telegramChatId ? user.telegramChatId : null;
+}
+
+async function saveTelegramChatId(userId, chatId) {
+    try {
+        await window.updateDoc(window.doc(window.db, 'users', userId), { telegramChatId: chatId.trim() });
+        showToast('Telegram Chat ID kaydedildi! ✅', 'telegram');
+        // systemUsers dizisini de güncelle
+        const u = systemUsers.find(u => u.id === userId);
+        if (u) u.telegramChatId = chatId.trim();
+    } catch (e) {
+        showToast('Kaydedilemedi!', 'error');
+    }
+}
+window.saveTelegramChatId = saveTelegramChatId;
+
+window.saveWorkerTelegramId = async function () {
+    const input = document.getElementById('wrk-tg-chat-id');
+    const statusEl = document.getElementById('wrk-tg-status');
+    if (!input || !input.value.trim()) {
+        showToast('Lütfen Chat ID girin.', 'error');
+        return;
+    }
+    const me = systemUsers.find(u => u.name === currentUser);
+    if (!me) { showToast('Kullanıcı bulunamadı.', 'error'); return; }
+    await saveTelegramChatId(me.id, input.value.trim());
+    if (statusEl) {
+        statusEl.innerHTML = `<span style="color:var(--clr-success)">✅ Bildirimler aktif (Chat ID: ${input.value.trim()})</span>`;
+    }
+};
+
 // ─── ADD TASK ───────────────────────────────────────────────
 
 if (addTaskForm) {
@@ -140,6 +198,13 @@ if (leaveForm) {
             showToast('İzin talebi gönderildi.', 'event_available');
             leaveForm.reset();
             renderLeaveCalendar();
+            // Telegram: Amire izin talebi bildirimi
+            const startFmt = new Date(start).toLocaleDateString('tr-TR');
+            const endFmt = new Date(end).toLocaleDateString('tr-TR');
+            await sendTelegramNotification(
+                SUPERVISOR_CHAT_ID,
+                `📅 <b>Titan Makina - İzin Talebi</b>\n\n👷 <b>${currentUser}</b> izin talebinde bulundu.\n🗓 ${startFmt} → ${endFmt}\n\nLütfen uygulamayı kontrol edin.`
+            );
         } catch (e) {
             showToast('İzin talebi gönderilemedi.', 'error');
         }
@@ -183,6 +248,11 @@ if (materialForm) {
             const prevEl = document.getElementById('mat-image-preview');
             if (nameEl) nameEl.textContent = 'Fotoğraf Ekle (Opsiyonel)';
             if (prevEl) { prevEl.src = ''; prevEl.style.display = 'none'; }
+            // Telegram: Amire malzeme talebi bildirimi
+            await sendTelegramNotification(
+                SUPERVISOR_CHAT_ID,
+                `📦 <b>Titan Makina - Malzeme Talebi</b>\n\n👷 <b>${currentUser}</b> malzeme talep etti.\n📋 <b>${name}</b>${desc ? '\n📝 ' + desc : ''}\n\nLütfen uygulamayı kontrol edin.`
+            );
         } catch (e) {
             showToast('Talep gönderilemedi.', 'error');
         }
@@ -534,6 +604,20 @@ window.switchTab = function (role, tabName, navItem) {
         if (role === 'supervisor') renderSupervisorMaterials();
         if (role === 'worker') renderWorkerMaterials();
     }
+    if (tabName === 'telegram' && role === 'worker') {
+        // Mevcut Chat ID'yi input'a doldur
+        const me = systemUsers.find(u => u.name === currentUser);
+        const input = document.getElementById('wrk-tg-chat-id');
+        const statusEl = document.getElementById('wrk-tg-status');
+        if (input && me) {
+            input.value = me.telegramChatId || '';
+            if (statusEl) {
+                statusEl.innerHTML = me.telegramChatId
+                    ? `<span style="color:var(--clr-success)">✅ Bildirimler aktif (Chat ID: ${me.telegramChatId})</span>`
+                    : `<span style="color:var(--clr-text-muted)">⚠️ Henüz Chat ID girilmedi. Bildirimler devre dışı.</span>`;
+            }
+        }
+    }
 };
 
 // ─── TASK FUNCTIONS ─────────────────────────────────────────
@@ -572,6 +656,13 @@ async function addTask(title, worker, priority, file = null) {
             imageUrl, completedImageUrl: null
         });
         showToast('Görev başarıyla atandı!', 'task_alt');
+        // Telegram: Ustaya bildirim gönder
+        const workerChatId = getWorkerChatId(worker);
+        const priorityLabel = { low: '🟢 Düşük', medium: '🟡 Normal', high: '🔴 Acil' }[priority] || priority;
+        await sendTelegramNotification(
+            workerChatId,
+            `🔧 <b>Titan Makina - Yeni Görev</b>\n\n📋 <b>${title}</b>\nÖncelik: ${priorityLabel}\n\nLütfen uygulamayı kontrol edin.`
+        );
     } catch (e) {
         showToast('Görev eklenirken hata oluştu!', 'error');
     }
@@ -582,6 +673,14 @@ async function updateTaskStatus(taskId, newStatus) {
         await window.updateDoc(window.doc(window.db, "tasks", taskId), { status: newStatus });
         const msgs = { progress: 'Görev başlatıldı', completed: 'Görev tamamlandı!' };
         showToast(msgs[newStatus] || 'Güncellendi', 'check');
+        // Telegram: Amire bildirim gönder
+        const task = tasks.find(t => t.id === taskId);
+        if (task && newStatus === 'progress') {
+            await sendTelegramNotification(
+                SUPERVISOR_CHAT_ID,
+                `⚙️ <b>Titan Makina - Görev Başlatıldı</b>\n\n📋 <b>${task.title}</b>\n👷 ${task.worker} görevi başlattı.`
+            );
+        }
     } catch (e) { showToast('Durum güncellenemedi!', 'error'); }
 }
 
@@ -775,6 +874,14 @@ window.completeTaskWithImage = async function (taskId) {
         if (completedImageUrl) data.completedImageUrl = completedImageUrl;
         await window.updateDoc(window.doc(window.db, "tasks", taskId), data);
         showToast('Görev tamamlandı!', 'done_all');
+        // Telegram: Amire tamamlandı bildirimi gönder
+        const task = tasks.find(t => t.id === taskId);
+        if (task) {
+            await sendTelegramNotification(
+                SUPERVISOR_CHAT_ID,
+                `✅ <b>Titan Makina - Görev Tamamlandı</b>\n\n📋 <b>${task.title}</b>\n👷 ${task.worker} görevi tamamladı.`
+            );
+        }
     } catch (e) { showToast('Durum güncellenemedi!', 'error'); if (btn) { btn.disabled = false; } }
 };
 
@@ -880,6 +987,21 @@ window.updateLeaveStatus = async function (leaveId, status) {
         const msg = status === 'approved' ? 'İzin onaylandı.' : (status === 'cancelled' ? 'İzin iptal edildi.' : 'İzin reddedildi.');
         const icon = status === 'approved' ? 'thumb_up' : (status === 'cancelled' ? 'cancel' : 'thumb_down');
         showToast(msg, icon);
+        // Telegram: Ustaya izin kararını bildir
+        if (status === 'approved' || status === 'rejected') {
+            const leave = leaves.find(l => l.id === leaveId);
+            if (leave) {
+                const workerChatId = getWorkerChatId(leave.worker);
+                const statusEmoji = status === 'approved' ? '✅' : '❌';
+                const statusText = status === 'approved' ? 'ONAYLANDI' : 'REDDEDİLDİ';
+                const startFmt = new Date(leave.start).toLocaleDateString('tr-TR');
+                const endFmt = new Date(leave.end).toLocaleDateString('tr-TR');
+                await sendTelegramNotification(
+                    workerChatId,
+                    `${statusEmoji} <b>Titan Makina - İzin Talebi ${statusText}</b>\n\n🗓 ${startFmt} → ${endFmt} tarihli izin talebiniz <b>${statusText}</b>.`
+                );
+            }
+        }
     } catch (e) { showToast('Durum güncellenemedi', 'error'); }
 };
 
@@ -1152,6 +1274,17 @@ window.updateMaterialStatus = async function (materialId, status) {
         const msgs = { 'approved': 'Talebi onayladınız.', 'rejected': 'Talebi reddettiniz.' };
         const iconClasses = { 'approved': 'check_circle', 'rejected': 'cancel' };
         showToast(msgs[status] || 'Durum güncellendi.', iconClasses[status] || 'info');
+        // Telegram: Ustaya malzeme kararını bildir
+        const mat = materials.find(m => m.id === materialId);
+        if (mat) {
+            const workerChatId = getWorkerChatId(mat.worker);
+            const statusEmoji = status === 'approved' ? '✅' : '❌';
+            const statusText = status === 'approved' ? 'ONAYLANDI' : 'REDDEDİLDİ';
+            await sendTelegramNotification(
+                workerChatId,
+                `${statusEmoji} <b>Titan Makina - Malzeme Talebi ${statusText}</b>\n\n📋 <b>${mat.name}</b> isimli malzeme talebiniz <b>${statusText}</b>.`
+            );
+        }
     } catch (e) { showToast('Güncellenemedi.', 'error'); }
 };
 
@@ -1175,17 +1308,35 @@ function renderSystemUsers() {
         systemUsers.forEach(u => {
             const roleIcon = u.role === 'supervisor' ? 'admin_panel_settings' : 'engineering';
             const roleLabel = u.role === 'supervisor' ? 'Amir' : 'Usta';
+            const tgId = u.telegramChatId || '';
+            const tgStatus = tgId
+                ? `<span style="color:var(--clr-success);font-size:.78rem">✅ ${tgId}</span>`
+                : `<span style="color:var(--clr-text-muted);font-size:.78rem">Ayarlanmamış</span>`;
             list.insertAdjacentHTML('beforeend', `
-        <div class="task-card" style="display:flex;justify-content:space-between;align-items:center;padding:.9rem;margin-bottom:.5rem">
-        <div>
-            <div style="font-weight:600;font-size:1rem">${u.name}</div>
-            <div style="margin-top:.3rem;font-size:.82rem;color:var(--clr-text-muted);display:flex;align-items:center;gap:.4rem">
-                <span class="material-icons-round" style="font-size:.9rem">${roleIcon}</span> ${roleLabel}
-                &nbsp;|&nbsp; Şifre:
-                <span style="font-family:monospace;background:rgba(255,255,255,.08);padding:.1rem .4rem;border-radius:4px">${u.password}</span>
-                <span class="material-icons-round" style="font-size:1rem;cursor:pointer;color:var(--clr-primary)" onclick="window.promptEditPassword('${u.id}','${u.name}')" title="Şifreyi Değiştir">edit</span>
+        <div class="task-card" style="padding:.9rem;margin-bottom:.5rem">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+                <div>
+                    <div style="font-weight:600;font-size:1rem">${u.name}</div>
+                    <div style="margin-top:.3rem;font-size:.82rem;color:var(--clr-text-muted);display:flex;align-items:center;gap:.4rem">
+                        <span class="material-icons-round" style="font-size:.9rem">${roleIcon}</span> ${roleLabel}
+                        &nbsp;|&nbsp; Şifre:
+                        <span style="font-family:monospace;background:rgba(255,255,255,.08);padding:.1rem .4rem;border-radius:4px">${u.password}</span>
+                        <span class="material-icons-round" style="font-size:1rem;cursor:pointer;color:var(--clr-primary)" onclick="window.promptEditPassword('${u.id}','${u.name}')" title="Şifreyi Değiştir">edit</span>
+                    </div>
+                </div>
             </div>
-        </div>
+            <div style="margin-top:.7rem;padding-top:.7rem;border-top:1px solid rgba(255,255,255,.07)">
+                <div style="font-size:.8rem;color:var(--clr-text-muted);margin-bottom:.4rem;display:flex;align-items:center;gap:.4rem">
+                    <span class="material-icons-round" style="font-size:.9rem">send</span> Telegram Chat ID: ${tgStatus}
+                </div>
+                <div style="display:flex;gap:.5rem;align-items:center">
+                    <input type="text" id="tg-input-${u.id}" value="${tgId}" placeholder="Chat ID girin..."
+                        style="flex:1;padding:.4rem .7rem;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.07);color:inherit;font-size:.85rem">
+                    <button class="action-btn success" style="padding:.4rem .7rem;font-size:.8rem" onclick="window.saveTelegramChatId('${u.id}', document.getElementById('tg-input-${u.id}').value)">
+                        <span class="material-icons-round" style="font-size:.9rem">save</span> Kaydet
+                    </button>
+                </div>
+            </div>
         </div>
             `);
         });
