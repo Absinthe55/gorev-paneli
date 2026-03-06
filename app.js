@@ -1229,6 +1229,13 @@ function renderWorkerMaterials() {
             return `<div class="comment ${c.role}"><strong>${c.author}:</strong> ${c.text} ${commentTime}</div>`
         }).join('');
         const imageHtml = m.imageUrl ? `<div class="task-img-wrap"><img src="${m.imageUrl}" loading="lazy" onclick="openImageModal('${m.imageUrl}', event)"></div>` : '';
+        const selfApproveHtml = m.status === 'pending' ? `
+        <div class="task-actions" style="margin-top:.5rem" onclick="event.stopPropagation()">
+            <button class="action-btn success" onclick="window.workerSelfApproveMaterial('${m.id}')">
+                <span class="material-icons-round">check_circle</span> Onayla (Temin Ettim)
+            </button>
+        </div>` : '';
+
         list.insertAdjacentHTML('beforeend', `
         <div class="task-card" onclick="window.toggleTaskCard(this, event)">
                 <div class="task-header">
@@ -1245,6 +1252,7 @@ function renderWorkerMaterials() {
             <input type="text" class="comment-input" id="mc-${m.id}" placeholder="Yorum ekle...">
                 <button class="action-btn" onclick="window.addComment('${m.id}')"><span class="material-icons-round">send</span></button>
         </div>
+                ${selfApproveHtml}
             </div >
             `);
     });
@@ -1281,6 +1289,26 @@ window.addComment = async function (materialId) {
             }
         }
     } catch (e) { showToast('Yorum eklenemedi.', 'error'); }
+};
+
+// Usta kendi talebini onaylayabilir (temin etti bildirimi)
+window.workerSelfApproveMaterial = async function (materialId) {
+    if (!confirm('Bu malzemeyi temin ettiğinizi onaylamak istiyor musunuz?')) return;
+    try {
+        await window.updateDoc(window.doc(window.db, 'materials', materialId), {
+            status: 'approved',
+            resolvedAt: new Date().toISOString()
+        });
+        showToast('Talep onaylandı olarak işaretlendi.', 'check_circle');
+        // Amire bildir
+        const mat = materials.find(m => m.id === materialId);
+        if (mat) {
+            await sendTelegramNotification(
+                SUPERVISOR_CHAT_ID,
+                `✅ <b>Titan Makina - Malzeme Temin Edildi</b>\n\n👷 <b>${currentUser}</b>, "<b>${mat.name}</b>" malzeme talebini temin ederek onayladı.`
+            );
+        }
+    } catch (e) { showToast('Güncellenemedi.', 'error'); }
 };
 
 window.resolveMaterial = async function (materialId) {
