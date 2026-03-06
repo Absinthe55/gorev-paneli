@@ -1245,13 +1245,33 @@ function renderWorkerMaterials() {
 window.addComment = async function (materialId) {
     const input = document.getElementById(`mc-${materialId}`);
     if (!input || !input.value.trim()) return;
+    const commentText = input.value.trim();
     try {
         const mat = materials.find(m => m.id === materialId);
         const comments = mat ? (mat.comments || []) : [];
-        comments.push({ author: currentUser, role: currentRole, text: input.value.trim(), ts: new Date().toISOString() });
+        comments.push({ author: currentUser, role: currentRole, text: commentText, ts: new Date().toISOString() });
         await window.updateDoc(window.doc(window.db, "materials", materialId), { comments });
         input.value = '';
         showToast('Yorum eklendi.', 'comment');
+
+        // Telegram bildirimi: usta yorum yaptıysa amire, amir yorum yaptıysa ustaya bildir
+        if (mat) {
+            const matName = mat.name || 'Malzeme Talebi';
+            if (currentRole === 'worker') {
+                // Ustadan amire
+                await sendTelegramNotification(
+                    SUPERVISOR_CHAT_ID,
+                    `💬 <b>Titan Makina - Yeni Yorum</b>\n\n👷 <b>${currentUser}</b>, "<b>${matName}</b>" talebine yorum yazdı:\n\n"${commentText}"`
+                );
+            } else if (currentRole === 'supervisor') {
+                // Amirden ustaya
+                const workerChatId = getWorkerChatId(mat.worker);
+                await sendTelegramNotification(
+                    workerChatId,
+                    `💬 <b>Titan Makina - Yeni Yorum</b>\n\n🔔 "<b>${matName}</b>" talebinize amir yorum yazdı:\n\n"${commentText}"`
+                );
+            }
+        }
     } catch (e) { showToast('Yorum eklenemedi.', 'error'); }
 };
 
