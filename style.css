@@ -1004,21 +1004,51 @@ input[type="date"] {
     left: 0;
     top: 0;
     bottom: 0;
-    width: 3px;
+    width: 4px;
     background: var(--clr-text-muted);
     border-radius: 0 4px 4px 0;
 }
 
+/* ── ACİL ─────────────────────── */
+.task-card.priority-high {
+    background: rgba(239, 68, 68, .08);
+    border-color: rgba(239, 68, 68, .25);
+}
+.task-card.priority-high:hover {
+    background: rgba(239, 68, 68, .13);
+}
 .task-card.priority-high::before {
+    width: 5px;
     background: var(--clr-danger);
+    box-shadow: 0 0 10px rgba(239, 68, 68, .6);
 }
 
+/* ── NORMAL ────────────────────── */
+.task-card.priority-medium {
+    background: rgba(59, 130, 246, .07);
+    border-color: rgba(59, 130, 246, .2);
+}
+.task-card.priority-medium:hover {
+    background: rgba(59, 130, 246, .12);
+}
 .task-card.priority-medium::before {
+    width: 5px;
     background: var(--clr-primary);
+    box-shadow: 0 0 10px rgba(59, 130, 246, .5);
 }
 
+/* ── DÜŞÜK ─────────────────────── */
+.task-card.priority-low {
+    background: rgba(16, 185, 129, .06);
+    border-color: rgba(16, 185, 129, .18);
+}
+.task-card.priority-low:hover {
+    background: rgba(16, 185, 129, .11);
+}
 .task-card.priority-low::before {
+    width: 5px;
     background: var(--clr-success);
+    box-shadow: 0 0 10px rgba(16, 185, 129, .5);
 }
 
 .task-header {
