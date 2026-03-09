@@ -402,33 +402,7 @@ if (docFileInput) {
     });
 }
 
-// ─── PULL TO REFRESH ────────────────────────────────────────
-
-(function initPullToRefresh() {
-    let startY = 0;
-    const spinner = document.getElementById('ptr-spinner');
-    const threshold = 80;
-
-    document.addEventListener('touchstart', (e) => {
-        startY = e.touches[0].clientY;
-    }, { passive: true });
-
-    document.addEventListener('touchend', (e) => {
-        const endY = e.changedTouches[0].clientY;
-        const diff = endY - startY;
-        // Only trigger if scrolled to very top of the active content area
-        const contentArea = document.querySelector('.screen.active .content-area');
-        const atTop = !contentArea || contentArea.scrollTop < 5;
-        if (diff > threshold && atTop) {
-            if (spinner) {
-                spinner.classList.add('visible');
-                setTimeout(() => {
-                    window.location.reload();
-                }, 700);
-            }
-        }
-    }, { passive: true });
-})();
+// Pull-to-refresh devre dışı bırakıldı.
 
 // ─── INIT ───────────────────────────────────────────────────
 
