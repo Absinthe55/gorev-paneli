@@ -20,6 +20,7 @@ let selectedLoginUser = null;
 let selectedLoginRole = null;
 let currentTaskFilter = 'all';
 let currentWorkerTaskFilter = 'all';
+let currentMaterialFilter = 'all';
 let presenceInterval = null;
 
 // DOM refs
@@ -635,7 +636,17 @@ window.switchTab = function (role, tabName, navItem) {
     const tab = document.getElementById(`${prefix}-tab-${tabName}`);
     if (tab) tab.classList.add('active');
     if (navItem) navItem.classList.add('active');
-    if (tabName === 'tasks' && role === 'supervisor') updateStats();
+    if (tabName === 'tasks' && role === 'supervisor') {
+        currentMaterialFilter = 'all';
+        updateStats();
+        // Stat chip sınıflarını ve onclick'i sıfırla
+        const pe = document.getElementById('sup-pending-count');
+        const pr = document.getElementById('sup-progress-count');
+        const co = document.getElementById('sup-completed-count');
+        if (pr) { pr.parentElement.className = 'stat-chip progress'; pr.parentElement.onclick = null; pr.parentElement.style.cursor = ''; pr.parentElement.style.opacity = '1'; }
+        if (co) { co.parentElement.className = 'stat-chip completed'; co.parentElement.onclick = null; co.parentElement.style.cursor = ''; co.parentElement.style.opacity = '1'; }
+        if (pe) { pe.parentElement.onclick = null; pe.parentElement.style.cursor = ''; pe.parentElement.style.opacity = '1'; }
+    }
     if (tabName === 'calendar') {
         renderLeaveCalendar();
         if (role === 'supervisor') renderSupervisorLeaves();
@@ -768,10 +779,40 @@ function updateMaterialStats() {
     const pe = document.getElementById('sup-pending-count');
     const pr = document.getElementById('sup-progress-count');
     const co = document.getElementById('sup-completed-count');
-    if (pe) pe.textContent = c.pending + ' Bekliyor';
-    if (pr) pr.textContent = c.approved + ' Onaylı';
-    if (co) co.textContent = c.rejected + ' Reddedildi';
+    if (pe) {
+        pe.textContent = c.pending + ' Bekliyor';
+        pe.parentElement.onclick = () => window.filterMaterials('pending');
+        pe.parentElement.style.cursor = 'pointer';
+    }
+    if (pr) {
+        pr.textContent = c.approved + ' Onaylı';
+        pr.parentElement.className = 'stat-chip completed';
+        pr.parentElement.onclick = () => window.filterMaterials('approved');
+        pr.parentElement.style.cursor = 'pointer';
+    }
+    if (co) {
+        co.textContent = c.rejected + ' Reddedildi';
+        co.parentElement.className = 'stat-chip progress';
+        co.parentElement.onclick = () => window.filterMaterials('rejected');
+        co.parentElement.style.cursor = 'pointer';
+    }
 }
+
+window.filterMaterials = function (filter) {
+    currentMaterialFilter = currentMaterialFilter === filter ? 'all' : filter;
+    renderSupervisorMaterials();
+    // Aktif chip'i vurgula
+    const pe = document.getElementById('sup-pending-count');
+    const pr = document.getElementById('sup-progress-count');
+    const co = document.getElementById('sup-completed-count');
+    [pe, pr, co].forEach(el => { if (el) el.parentElement.style.opacity = '1'; });
+    if (currentMaterialFilter !== 'all') {
+        [pe, pr, co].forEach(el => { if (el) el.parentElement.style.opacity = '0.4'; });
+        if (currentMaterialFilter === 'pending' && pe) pe.parentElement.style.opacity = '1';
+        if (currentMaterialFilter === 'approved' && pr) pr.parentElement.style.opacity = '1';
+        if (currentMaterialFilter === 'rejected' && co) co.parentElement.style.opacity = '1';
+    }
+};
 
 window.filterTasks = function (filter, btn) {
     currentTaskFilter = filter;
@@ -1297,7 +1338,12 @@ function renderSupervisorMaterials() {
     if (!list) return;
     if (materials.length === 0) { list.innerHTML = '<div class="empty-state">Malzeme talebi yok.</div>'; return; }
     list.innerHTML = '';
-    sortByStatus(materials).forEach(m => {
+    let filtered = sortByStatus(materials);
+    if (currentMaterialFilter === 'pending') filtered = filtered.filter(m => m.status === 'pending');
+    else if (currentMaterialFilter === 'approved') filtered = filtered.filter(m => m.status === 'approved' || m.status === 'resolved');
+    else if (currentMaterialFilter === 'rejected') filtered = filtered.filter(m => m.status === 'rejected');
+    if (filtered.length === 0) { list.innerHTML = '<div class="empty-state">Bu filtrede malzeme talebi yok.</div>'; return; }
+    filtered.forEach(m => {
         const statusMap = {
             pending: { cls: 'pending', label: 'Bekliyor' },
             resolved: { cls: 'completed', label: 'Çözüldü' }, // Eski kayıtlar için
