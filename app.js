@@ -798,16 +798,28 @@ function renderSupervisorTasks() {
         const compImgHtml = task.completedImageUrl ? `<div class="task-img-wrap completed-img"><div class="img-label"><span class="material-icons-round">done_all</span> Tamamlandı</div><img src="${task.completedImageUrl}" loading="lazy" onclick="openImageModal('${task.completedImageUrl}', event)"></div>` : '';
         const matHtml = task.materialRequest ? `<div class="material-alert" onclick="event.stopPropagation()"><span class="material-icons-round">warning_amber</span> <strong>Eksik Malzeme:</strong> ${task.materialRequest}</div>` : '';
 
+        const originalTitleHtml = task.originalTitle
+            ? `<div style="font-size:.75rem;color:var(--clr-text-muted);margin-top:.2rem;opacity:.7">(önceki: ${task.originalTitle})</div>`
+            : '';
+        const editedHtml = task.editedBy
+            ? `<span class="chip chip-muted" style="font-size:.7rem"><span class="material-icons-round" style="font-size:.75rem">edit</span> ${task.editedBy}</span>`
+            : '';
+
         supervisorTasks.insertAdjacentHTML('beforeend', `
             <div class="task-card priority-${task.priority}" onclick="toggleTaskCard(this, event)">
                 <div class="task-header">
-                    <div class="task-title">${task.title}</div>
+                    <div class="task-title">
+                        ${task.title}
+                        <span class="material-icons-round" style="font-size:.9rem;vertical-align:middle;color:var(--clr-primary);cursor:pointer;margin-left:.3rem" onclick="event.stopPropagation();window.startEditTask('${task.id}')" title="Düzenle">edit</span>
+                        ${originalTitleHtml}
+                    </div>
                     <div class="task-time">${time}</div>
                 </div>
                 <div class="task-chips">
                     <span class="chip chip-${s.cls}"><span class="material-icons-round">${s.icon}</span> ${s.text}</span>
                     <span class="chip chip-muted"><span class="material-icons-round">person</span> ${task.worker}</span>
                     ${seenHtml}
+                    ${editedHtml}
                 </div>
                 ${imageHtml}${compImgHtml}${matHtml}
                 <div class="task-actions" onclick="event.stopPropagation()">
@@ -864,10 +876,17 @@ function renderWorkerTasks() {
                 </div>`;
         }
 
+        const origTitleHtml = task.originalTitle
+            ? `<div style="font-size:.75rem;color:var(--clr-text-muted);margin-top:.2rem;opacity:.7">(önceki: ${task.originalTitle})</div>`
+            : '';
+
         workerTasks.insertAdjacentHTML('beforeend', `
             <div class="task-card priority-${task.priority}" onclick="window.toggleTaskCard(this, event, '${task.id}', '${task.status}', '${task.seenAt || ''}')">
                 <div class="task-header">
-                    <div class="task-title">${task.title}</div>
+                    <div class="task-title">
+                        ${task.title}
+                        ${origTitleHtml}
+                    </div>
                     <div class="task-time">${time}</div>
                 </div>
                 <div class="task-chips">
@@ -896,6 +915,69 @@ window.deleteTask = async function (taskId) {
         } catch (e) { showToast('Silinemedi!', 'error'); }
     }
 };
+
+// ─── INLINE EDIT: GÖREV ─────────────────────────────────────
+window.startEditTask = function (taskId) {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    const newTitle = prompt('Görev başlığını düzenle:', task.title);
+    if (newTitle === null || !newTitle.trim() || newTitle.trim() === task.title) return;
+    window.saveEditTask(taskId, task.title, newTitle.trim());
+};
+
+window.saveEditTask = async function (taskId, oldTitle, newTitle) {
+    const task = tasks.find(t => t.id === taskId);
+    const update = { title: newTitle, editedBy: currentUser, editedAt: new Date().toISOString() };
+    // Orijinal başlığı sadece ilk düzenlemede sakla
+    if (!task.originalTitle) update.originalTitle = oldTitle;
+    try {
+        await window.updateDoc(window.doc(window.db, 'tasks', taskId), update);
+        showToast('Görev güncellendi.', 'edit');
+    } catch (e) { showToast('Güncellenemedi.', 'error'); }
+};
+
+// ─── INLINE EDIT: MALZEME ───────────────────────────────────
+window.startEditMaterial = function (materialId) {
+    const mat = materials.find(m => m.id === materialId);
+    if (!mat) return;
+    const newName = prompt('Malzeme adını düzenle:', mat.name);
+    if (newName === null || !newName.trim() || newName.trim() === mat.name) return;
+    window.saveEditMaterial(materialId, mat, newName.trim());
+};
+
+window.saveEditMaterial = async function (materialId, mat, newName) {
+    const update = { name: newName, editedBy: currentUser, editedAt: new Date().toISOString() };
+    if (!mat.originalName) update.originalName = mat.name;
+    try {
+        await window.updateDoc(window.doc(window.db, 'materials', materialId), update);
+        showToast('Malzeme güncellendi.', 'edit');
+    } catch (e) { showToast('Güncellenemedi.', 'error'); }
+};
+
+// ─── INLINE EDIT: YORUM ─────────────────────────────────────
+window.startEditComment = function (materialId, commentIndex) {
+    const mat = materials.find(m => m.id === materialId);
+    if (!mat || !mat.comments || !mat.comments[commentIndex]) return;
+    const comment = mat.comments[commentIndex];
+    if (comment.author !== currentUser) { showToast('Sadece kendi yorumunuzu düzenleyebilirsiniz.', 'error'); return; }
+    const newText = prompt('Yorumu düzenle:', comment.text);
+    if (newText === null || !newText.trim() || newText.trim() === comment.text) return;
+    window.saveEditComment(materialId, commentIndex, comment, newText.trim());
+};
+
+window.saveEditComment = async function (materialId, commentIndex, comment, newText) {
+    const mat = materials.find(m => m.id === materialId);
+    if (!mat) return;
+    const comments = [...(mat.comments || [])];
+    const updated = { ...comments[commentIndex], text: newText, editedAt: new Date().toISOString() };
+    if (!updated.originalText) updated.originalText = comment.text;
+    comments[commentIndex] = updated;
+    try {
+        await window.updateDoc(window.doc(window.db, 'materials', materialId), { comments });
+        showToast('Yorum güncellendi.', 'edit');
+    } catch (e) { showToast('Güncellenemedi.', 'error'); }
+};
+
 
 window.previewCompleteImage = function (input, taskId) {
     const file = input.files[0];
@@ -1212,15 +1294,26 @@ function renderSupervisorMaterials() {
         const resolvedTime = m.resolvedAt && (m.status === 'resolved' || m.status === 'approved' || m.status === 'rejected') ? ` | Kapanış: ${new Date(m.resolvedAt).toLocaleString('tr-TR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}` : '';
         const timeHtml = `<div class="task-time">${openTime}${resolvedTime}</div>`;
 
-        const commentsHtml = (m.comments || []).map(c => {
+        const commentsHtml = (m.comments || []).map((c, idx) => {
             const commentTime = c.ts ? `<span style="font-size:0.7rem;color:var(--clr-text-muted);margin-left:5px">(${new Date(c.ts).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })})</span>` : '';
-            return `<div class="comment ${c.role}"><strong>${c.author}:</strong> ${c.text} ${commentTime}</div>`
+            const originalCommentHtml = c.originalText
+                ? `<span style="font-size:.75rem;color:var(--clr-text-muted);opacity:.65;margin-left:.3rem">(önceki: ${c.originalText})</span>`
+                : '';
+            const editIcon = c.author === currentUser
+                ? `<span class="material-icons-round" style="font-size:.8rem;vertical-align:middle;color:var(--clr-primary);cursor:pointer;margin-left:.4rem" onclick="event.stopPropagation();window.startEditComment('${m.id}',${idx})" title="Düzenle">edit</span>`
+                : '';
+            return `<div class="comment ${c.role}"><strong>${c.author}:</strong> ${c.text} ${originalCommentHtml}${editIcon}${commentTime}</div>`;
         }).join('');
         const imageHtml = m.imageUrl ? `<div class="task-img-wrap"><img src="${m.imageUrl}" loading="lazy" onclick="openImageModal('${m.imageUrl}', event)"></div>` : '';
+        const origNameHtml = m.originalName ? `<div style="font-size:.75rem;color:var(--clr-text-muted);opacity:.7;margin-top:.15rem">(önceki: ${m.originalName})</div>` : '';
         list.insertAdjacentHTML('beforeend', `
         <div class="task-card" onclick="window.toggleTaskCard(this, event)">
                 <div class="task-header">
-                    <div class="task-title"><span class="material-icons-round" style="font-size:1rem;vertical-align:middle">inventory_2</span> ${m.name}</div>
+                    <div class="task-title">
+                        <span class="material-icons-round" style="font-size:1rem;vertical-align:middle">inventory_2</span> ${m.name}
+                        <span class="material-icons-round" style="font-size:.9rem;vertical-align:middle;color:var(--clr-primary);cursor:pointer;margin-left:.3rem" onclick="event.stopPropagation();window.startEditMaterial('${m.id}')" title="Düzenle">edit</span>
+                        ${origNameHtml}
+                    </div>
                     ${timeHtml}
                 </div>
                 <div class="task-chips">
@@ -1265,9 +1358,15 @@ function renderWorkerMaterials() {
         const resolvedTime = m.resolvedAt && (m.status === 'resolved' || m.status === 'approved' || m.status === 'rejected') ? ` | Kapanış: ${new Date(m.resolvedAt).toLocaleString('tr-TR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}` : '';
         const timeHtml = `<div class="task-time">${openTime}${resolvedTime}</div>`;
 
-        const commentsHtml = (m.comments || []).map(c => {
+        const commentsHtml = (m.comments || []).map((c, idx) => {
             const commentTime = c.ts ? `<span style="font-size:0.7rem;color:var(--clr-text-muted);margin-left:5px">(${new Date(c.ts).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })})</span>` : '';
-            return `<div class="comment ${c.role}"><strong>${c.author}:</strong> ${c.text} ${commentTime}</div>`
+            const originalCommentHtml = c.originalText
+                ? `<span style="font-size:.75rem;color:var(--clr-text-muted);opacity:.65;margin-left:.3rem">(önceki: ${c.originalText})</span>`
+                : '';
+            const editIcon = c.author === currentUser
+                ? `<span class="material-icons-round" style="font-size:.8rem;vertical-align:middle;color:var(--clr-primary);cursor:pointer;margin-left:.4rem" onclick="event.stopPropagation();window.startEditComment('${m.id}',${idx})" title="Düzenle">edit</span>`
+                : '';
+            return `<div class="comment ${c.role}"><strong>${c.author}:</strong> ${c.text} ${originalCommentHtml}${editIcon}${commentTime}</div>`;
         }).join('');
         const imageHtml = m.imageUrl ? `<div class="task-img-wrap"><img src="${m.imageUrl}" loading="lazy" onclick="openImageModal('${m.imageUrl}', event)"></div>` : '';
         const selfApproveHtml = m.status === 'pending' ? `
@@ -1280,7 +1379,11 @@ function renderWorkerMaterials() {
         list.insertAdjacentHTML('beforeend', `
         <div class="task-card" onclick="window.toggleTaskCard(this, event)">
                 <div class="task-header">
-                    <div class="task-title">${m.name}</div>
+                    <div class="task-title">
+                        ${m.name}
+                        <span class="material-icons-round" style="font-size:.9rem;vertical-align:middle;color:var(--clr-primary);cursor:pointer;margin-left:.3rem" onclick="event.stopPropagation();window.startEditMaterial('${m.id}')" title="Düzenle">edit</span>
+                        ${m.originalName ? `<div style="font-size:.75rem;color:var(--clr-text-muted);opacity:.7;margin-top:.15rem">(önceki: ${m.originalName})</div>` : ''}
+                    </div>
                     ${timeHtml}
                 </div>
                 <div class="task-chips">
