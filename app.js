@@ -635,16 +635,17 @@ window.switchTab = function (role, tabName, navItem) {
     const tab = document.getElementById(`${prefix}-tab-${tabName}`);
     if (tab) tab.classList.add('active');
     if (navItem) navItem.classList.add('active');
-    if (tabName === 'profile') renderSystemUsers();
+    if (tabName === 'tasks' && role === 'supervisor') updateStats();
     if (tabName === 'calendar') {
         renderLeaveCalendar();
         if (role === 'supervisor') renderSupervisorLeaves();
         if (role === 'worker') renderWorkerLeaves();
     }
     if (tabName === 'materials') {
-        if (role === 'supervisor') renderSupervisorMaterials();
+        if (role === 'supervisor') { renderSupervisorMaterials(); updateMaterialStats(); }
         if (role === 'worker') renderWorkerMaterials();
     }
+    if (tabName === 'profile') renderSystemUsers();
     if (tabName === 'telegram' && role === 'worker') {
         // Mevcut Chat ID'yi input'a doldur
         const me = systemUsers.find(u => u.name === currentUser);
@@ -755,6 +756,21 @@ function updateStats() {
     if (pe) pe.textContent = c.pending + ' Bekliyor';
     if (pr) pr.textContent = c.progress + ' Devam';
     if (co) co.textContent = c.completed + ' Bitti';
+}
+
+function updateMaterialStats() {
+    const c = { pending: 0, approved: 0, rejected: 0 };
+    materials.forEach(m => {
+        if (m.status === 'pending') c.pending++;
+        else if (m.status === 'approved' || m.status === 'resolved') c.approved++;
+        else if (m.status === 'rejected') c.rejected++;
+    });
+    const pe = document.getElementById('sup-pending-count');
+    const pr = document.getElementById('sup-progress-count');
+    const co = document.getElementById('sup-completed-count');
+    if (pe) pe.textContent = c.pending + ' Bekliyor';
+    if (pr) pr.textContent = c.approved + ' Onaylı';
+    if (co) co.textContent = c.rejected + ' Reddedildi';
 }
 
 window.filterTasks = function (filter, btn) {
