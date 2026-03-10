@@ -15,10 +15,12 @@ let unsubscribe = null;
 let leavesUnsubscribe = null;
 let materialsUnsubscribe = null;
 let docsUnsubscribe = null;
+let usersUnsubscribe = null;
 let selectedLoginUser = null;
 let selectedLoginRole = null;
 let currentTaskFilter = 'all';
 let currentWorkerTaskFilter = 'all';
+let presenceInterval = null;
 
 // DOM refs
 const screens = {
@@ -156,6 +158,65 @@ window.saveWorkerTelegramId = async function () {
         statusEl.innerHTML = `<span style="color:var(--clr-success)">✅ Bildirimler aktif (Chat ID: ${input.value.trim()})</span>`;
     }
 };
+
+// ─── PRESENCE / ONLINE STATUS ───────────────────────────────
+
+function formatLastSeen(ts) {
+    if (!ts) return 'Hiç giriş yapmadı';
+    const diff = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
+    if (diff < 60) return 'Az önce';
+    if (diff < 3600) return `${Math.floor(diff / 60)} dakika önce`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)} saat önce`;
+    return `${Math.floor(diff / 86400)} gün önce`;
+}
+
+async function setUserPresence(isOnline) {
+    const me = systemUsers.find(u => u.name === currentUser);
+    if (!me) return;
+    try {
+        await window.updateDoc(window.doc(window.db, 'users', me.id), {
+            isOnline,
+            lastSeen: new Date().toISOString()
+        });
+    } catch (e) { /* sessizce geç */ }
+}
+
+function startPresenceHeartbeat() {
+    stopPresenceHeartbeat();
+    setUserPresence(true);
+    presenceInterval = setInterval(() => setUserPresence(true), 60000);
+}
+
+function stopPresenceHeartbeat() {
+    if (presenceInterval) { clearInterval(presenceInterval); presenceInterval = null; }
+}
+
+function listenForUsers() {
+    if (usersUnsubscribe) usersUnsubscribe();
+    const q = window.collection(window.db, 'users');
+    usersUnsubscribe = window.onSnapshot(q, (snap) => {
+        snap.forEach(d => {
+            const idx = systemUsers.findIndex(u => u.id === d.id);
+            if (idx > -1) {
+                systemUsers[idx] = { id: d.id, ...d.data() };
+            } else {
+                systemUsers.push({ id: d.id, ...d.data() });
+            }
+        });
+        // Ekip sekmesi açıksa anlık güncelle
+        if (currentRole === 'supervisor') renderSystemUsers();
+    });
+}
+
+// Sekme/tarayıcı kapanırken offline işaretle
+window.addEventListener('beforeunload', () => {
+    const me = systemUsers.find(u => u.name === currentUser);
+    if (!me) return;
+    // sendBeacon, async updateDoc yerine kullanılır (sayfa kapanırken çalışır)
+    const url = `https://firestore.googleapis.com/v1/projects/${window.db.app.options.projectId}/databases/(default)/documents/users/${me.id}?updateMask.fieldPaths=isOnline&updateMask.fieldPaths=lastSeen`;
+    const body = JSON.stringify({ fields: { isOnline: { booleanValue: false }, lastSeen: { stringValue: new Date().toISOString() } } });
+    navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }));
+});
 
 // ─── ADD TASK ───────────────────────────────────────────────
 
@@ -537,15 +598,21 @@ function login(username, role, showWelcome = true) {
     listenForLeaves();
     listenForMaterials();
     listenForDocuments();
+    listenForUsers();
+    // Presence: biraz bekle systemUsers yüklensın
+    setTimeout(() => startPresenceHeartbeat(), 1500);
 }
 
 function logout() {
+    stopPresenceHeartbeat();
+    setUserPresence(false);
     currentUser = null; currentRole = null;
     localStorage.removeItem('titan_user'); localStorage.removeItem('titan_role');
     if (unsubscribe) { unsubscribe(); unsubscribe = null; }
     if (leavesUnsubscribe) { leavesUnsubscribe(); leavesUnsubscribe = null; }
     if (materialsUnsubscribe) { materialsUnsubscribe(); materialsUnsubscribe = null; }
     if (docsUnsubscribe) { docsUnsubscribe(); docsUnsubscribe = null; }
+    if (usersUnsubscribe) { usersUnsubscribe(); usersUnsubscribe = null; }
     switchScreen('login');
     showToast('Çıkış yapıldı', 'logout');
     fetchUsers(); // Refresh login list
@@ -1333,43 +1400,63 @@ function renderSystemUsers() {
     const list = document.getElementById('user-management-list');
     if (!list) return;
     list.innerHTML = '';
-    fetchUsers().then(() => {
-        if (systemUsers.length === 0) { list.innerHTML = '<div class="empty-state">Kullanıcı bulunamadı.</div>'; return; }
-        systemUsers.forEach(u => {
-            const roleIcon = u.role === 'supervisor' ? 'admin_panel_settings' : 'engineering';
-            const roleLabel = u.role === 'supervisor' ? 'Amir' : 'Usta';
-            const tgId = u.telegramChatId || '';
-            const tgStatus = tgId
-                ? `<span style="color:var(--clr-success);font-size:.78rem">✅ ${tgId}</span>`
-                : `<span style="color:var(--clr-text-muted);font-size:.78rem">Ayarlanmamış</span>`;
-            list.insertAdjacentHTML('beforeend', `
-        <div class="task-card" style="padding:.9rem;margin-bottom:.5rem">
-            <div style="display:flex;justify-content:space-between;align-items:center">
-                <div>
-                    <div style="font-weight:600;font-size:1rem">${u.name}</div>
-                    <div style="margin-top:.3rem;font-size:.82rem;color:var(--clr-text-muted);display:flex;align-items:center;gap:.4rem">
-                        <span class="material-icons-round" style="font-size:.9rem">${roleIcon}</span> ${roleLabel}
-                        &nbsp;|&nbsp; Şifre:
-                        <span style="font-family:monospace;background:rgba(255,255,255,.08);padding:.1rem .4rem;border-radius:4px">${u.password}</span>
-                        <span class="material-icons-round" style="font-size:1rem;cursor:pointer;color:var(--clr-primary)" onclick="window.promptEditPassword('${u.id}','${u.name}')" title="Şifreyi Değiştir">edit</span>
-                    </div>
-                </div>
+    if (systemUsers.length === 0) { list.innerHTML = '<div class="empty-state">Kullanıcı bulunamadı.</div>'; return; }
+
+    systemUsers.forEach(u => {
+        const roleIcon = u.role === 'supervisor' ? 'admin_panel_settings' : 'engineering';
+        const roleLabel = u.role === 'supervisor' ? 'Amir' : 'Usta';
+        const tgId = u.telegramChatId || '';
+        const tgStatus = tgId
+            ? `<span style="color:var(--clr-success);font-size:.78rem">✅ ${tgId}</span>`
+            : `<span style="color:var(--clr-text-muted);font-size:.78rem">Ayarlanmamış</span>`;
+
+        // Çevrimiçi durumu
+        const isOnline = u.isOnline === true;
+        const lastSeenText = isOnline ? 'Çevrimiçi' : formatLastSeen(u.lastSeen);
+        const onlineDot = isOnline
+            ? `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#10b981;box-shadow:0 0 6px #10b981;flex-shrink:0"></span>`
+            : `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#475569;flex-shrink:0"></span>`;
+        const presenceColor = isOnline ? 'var(--clr-success)' : 'var(--clr-text-muted)';
+        const cardBorder = isOnline ? '1px solid rgba(16,185,129,.25)' : '';
+        const cardBg = isOnline ? 'background:rgba(16,185,129,.05);' : '';
+
+        list.insertAdjacentHTML('beforeend', `
+    <div class="task-card" style="padding:.9rem;margin-bottom:.5rem;${cardBg}${cardBorder ? `border:${cardBorder};` : ''}">
+        <!-- Presence başlık -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.65rem">
+            <div style="display:flex;align-items:center;gap:.5rem">
+                ${onlineDot}
+                <span style="font-size:.82rem;color:${presenceColor};font-weight:500">${lastSeenText}</span>
             </div>
-            <div style="margin-top:.7rem;padding-top:.7rem;border-top:1px solid rgba(255,255,255,.07)">
-                <div style="font-size:.8rem;color:var(--clr-text-muted);margin-bottom:.4rem;display:flex;align-items:center;gap:.4rem">
-                    <span class="material-icons-round" style="font-size:.9rem">send</span> Telegram Chat ID: ${tgStatus}
-                </div>
-                <div style="display:flex;gap:.5rem;align-items:center">
-                    <input type="text" id="tg-input-${u.id}" value="${tgId}" placeholder="Chat ID girin..."
-                        style="flex:1;padding:.4rem .7rem;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.07);color:inherit;font-size:.85rem">
-                    <button class="action-btn success" style="padding:.4rem .7rem;font-size:.8rem" onclick="window.saveTelegramChatId('${u.id}', document.getElementById('tg-input-${u.id}').value)">
-                        <span class="material-icons-round" style="font-size:.9rem">save</span> Kaydet
-                    </button>
+            <span style="font-size:.75rem;color:var(--clr-text-muted)">${isOnline ? '' : (u.lastSeen ? new Date(u.lastSeen).toLocaleString('tr-TR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '')}</span>
+        </div>
+        <!-- Üst satır: İsim + rol + şifre -->
+        <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+                <div style="font-weight:600;font-size:1rem">${u.name}</div>
+                <div style="margin-top:.3rem;font-size:.82rem;color:var(--clr-text-muted);display:flex;align-items:center;gap:.4rem">
+                    <span class="material-icons-round" style="font-size:.9rem">${roleIcon}</span> ${roleLabel}
+                    &nbsp;|&nbsp; Şifre:
+                    <span style="font-family:monospace;background:rgba(255,255,255,.08);padding:.1rem .4rem;border-radius:4px">${u.password}</span>
+                    <span class="material-icons-round" style="font-size:1rem;cursor:pointer;color:var(--clr-primary)" onclick="window.promptEditPassword('${u.id}','${u.name}')" title="Şifreyi Değiştir">edit</span>
                 </div>
             </div>
         </div>
-            `);
-        });
+        <!-- Telegram -->
+        <div style="margin-top:.7rem;padding-top:.7rem;border-top:1px solid rgba(255,255,255,.07)">
+            <div style="font-size:.8rem;color:var(--clr-text-muted);margin-bottom:.4rem;display:flex;align-items:center;gap:.4rem">
+                <span class="material-icons-round" style="font-size:.9rem">send</span> Telegram Chat ID: ${tgStatus}
+            </div>
+            <div style="display:flex;gap:.5rem;align-items:center">
+                <input type="text" id="tg-input-${u.id}" value="${tgId}" placeholder="Chat ID girin..."
+                    style="flex:1;padding:.4rem .7rem;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.07);color:inherit;font-size:.85rem">
+                <button class="action-btn success" style="padding:.4rem .7rem;font-size:.8rem" onclick="window.saveTelegramChatId('${u.id}', document.getElementById('tg-input-${u.id}').value)">
+                    <span class="material-icons-round" style="font-size:.9rem">save</span> Kaydet
+                </button>
+            </div>
+        </div>
+    </div>
+        `);
     });
 }
 
