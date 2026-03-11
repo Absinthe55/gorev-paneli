@@ -1936,3 +1936,253 @@ window.deleteDocument = async function (docId) {
         } catch (e) { showToast('Silinemedi!', 'error'); }
     }
 };
+
+// ─── IN-APP NOTIFICATION SYSTEM ─────────────────────────────
+
+let appNotifications = [];
+let notifInitialized = false; // İlk yüklemede bildirim üretme
+
+function addAppNotification(type, icon, text, targetTab) {
+    if (!notifInitialized) return;
+    const prefix = currentRole === 'supervisor' ? 'sup' : 'wrk';
+    appNotifications.unshift({
+        type, icon, text, targetTab,
+        ts: new Date().toISOString(),
+        id: Date.now() + Math.random()
+    });
+    // Max 50 bildirim tut
+    if (appNotifications.length > 50) appNotifications.length = 50;
+    updateNotifBadge(prefix);
+}
+
+function updateNotifBadge(prefix) {
+    const badge = document.getElementById(`${prefix}-notif-badge`);
+    if (!badge) return;
+    const count = appNotifications.length;
+    if (count > 0) {
+        badge.textContent = count > 99 ? '99+' : count;
+        badge.style.display = 'flex';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+function renderNotifPanel(prefix) {
+    const list = document.getElementById(`${prefix}-notif-list`);
+    if (!list) return;
+    if (appNotifications.length === 0) {
+        list.innerHTML = '<div class="empty-state" style="padding:1.5rem;font-size:.85rem">Bildirim yok</div>';
+        return;
+    }
+    list.innerHTML = appNotifications.map(n => {
+        const time = formatLastSeen(n.ts);
+        return `
+        <div class="notif-item" onclick="window.handleNotifClick('${prefix}','${n.targetTab}')">
+            <div class="notif-icon ${n.type}">
+                <span class="material-icons-round">${n.icon}</span>
+            </div>
+            <div class="notif-text">
+                ${n.text}
+                <span class="notif-time">${time}</span>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+window.toggleNotifPanel = function (prefix) {
+    const panel = document.getElementById(`${prefix}-notif-panel`);
+    if (!panel) return;
+    const isOpen = panel.style.display !== 'none';
+    panel.style.display = isOpen ? 'none' : 'block';
+    if (!isOpen) renderNotifPanel(prefix);
+};
+
+window.handleNotifClick = function (prefix, targetTab) {
+    const panel = document.getElementById(`${prefix}-notif-panel`);
+    if (panel) panel.style.display = 'none';
+    const role = prefix === 'sup' ? 'supervisor' : 'worker';
+    const navItems = document.querySelectorAll(`#${role}-screen .nav-item`);
+    // Target tab'a karşılık gelen nav item'ı bul
+    let matchedNav = null;
+    navItems.forEach(n => {
+        if (n.getAttribute('onclick') && n.getAttribute('onclick').includes(`'${targetTab}'`)) {
+            matchedNav = n;
+        }
+    });
+    window.switchTab(role, targetTab, matchedNav);
+};
+
+window.clearNotifications = function (prefix) {
+    appNotifications = [];
+    updateNotifBadge(prefix);
+    renderNotifPanel(prefix);
+};
+
+// Panel dışına tıklayınca kapat
+document.addEventListener('click', function (event) {
+    ['sup', 'wrk'].forEach(prefix => {
+        const panel = document.getElementById(`${prefix}-notif-panel`);
+        const btn = document.getElementById(`${prefix}-notif-btn`);
+        if (panel && panel.style.display !== 'none') {
+            if (!panel.contains(event.target) && !btn.contains(event.target)) {
+                panel.style.display = 'none';
+            }
+        }
+    });
+});
+
+// ─── SNAPSHOT-BASED NOTIFICATION TRIGGERS ────────────────────
+
+// Görevler: yeni görev, durum değişikliği, yeni yorum
+let prevTasksSnapshot = null;
+
+function checkTaskNotifications(newTasks) {
+    if (!prevTasksSnapshot) { prevTasksSnapshot = newTasks.map(t => JSON.stringify(t)); return; }
+    const prevMap = {};
+    prevTasksSnapshot.forEach(s => { const t = JSON.parse(s); prevMap[t.id] = t; });
+
+    newTasks.forEach(t => {
+        const prev = prevMap[t.id];
+        if (!prev) {
+            // Yeni görev
+            if (currentRole === 'supervisor') {
+                // Amir zaten görev atadı, bildirime gerek yok
+            } else if (t.worker === currentUser) {
+                addAppNotification('task', 'assignment', `<b>${t.title}</b> görevi size atandı.`, 'tasks');
+            }
+        } else {
+            // Durum değişikliği
+            if (prev.status !== t.status) {
+                if (currentRole === 'supervisor') {
+                    if (t.status === 'progress') addAppNotification('task', 'engineering', `<b>${t.worker}</b> "<b>${t.title}</b>" görevini başlattı.`, 'tasks');
+                    if (t.status === 'completed') addAppNotification('task', 'check_circle', `<b>${t.worker}</b> "<b>${t.title}</b>" görevini tamamladı.`, 'tasks');
+                } else if (t.worker === currentUser) {
+                    if (t.status === 'completed') addAppNotification('task', 'check_circle', `"<b>${t.title}</b>" göreviniz tamamlandı olarak işaretlendi.`, 'tasks');
+                }
+            }
+            // Yeni yorum
+            const prevComments = prev.comments ? prev.comments.length : 0;
+            const newComments = t.comments ? t.comments.length : 0;
+            if (newComments > prevComments) {
+                const lastComment = t.comments[t.comments.length - 1];
+                if (lastComment.author !== currentUser) {
+                    addAppNotification('comment', 'chat', `<b>${lastComment.author}</b> "<b>${t.title}</b>" görevine yorum yazdı: "${lastComment.text}"`, 'tasks');
+                }
+            }
+        }
+    });
+
+    prevTasksSnapshot = newTasks.map(t => JSON.stringify(t));
+}
+
+// Malzemeler: yeni talep, durum, yorum
+let prevMaterialsSnapshot = null;
+
+function checkMaterialNotifications(newMats) {
+    if (!prevMaterialsSnapshot) { prevMaterialsSnapshot = newMats.map(m => JSON.stringify(m)); return; }
+    const prevMap = {};
+    prevMaterialsSnapshot.forEach(s => { const m = JSON.parse(s); prevMap[m.id] = m; });
+
+    newMats.forEach(m => {
+        const prev = prevMap[m.id];
+        if (!prev) {
+            if (currentRole === 'supervisor' && m.worker !== currentUser) {
+                addAppNotification('material', 'inventory_2', `<b>${m.worker}</b> yeni malzeme talep etti: <b>${m.name}</b>`, 'materials');
+            }
+        } else {
+            if (prev.status !== m.status) {
+                if (currentRole === 'worker' && m.worker === currentUser) {
+                    const label = m.status === 'approved' ? 'onaylandı ✅' : m.status === 'rejected' ? 'reddedildi ❌' : m.status;
+                    addAppNotification('material', 'inventory_2', `"<b>${m.name}</b>" malzeme talebiniz ${label}.`, 'materials');
+                }
+            }
+            const prevComments = prev.comments ? prev.comments.length : 0;
+            const newComments = m.comments ? m.comments.length : 0;
+            if (newComments > prevComments) {
+                const lastComment = m.comments[m.comments.length - 1];
+                if (lastComment.author !== currentUser) {
+                    addAppNotification('comment', 'chat', `<b>${lastComment.author}</b> "<b>${m.name}</b>" talebine yorum yazdı.`, 'materials');
+                }
+            }
+        }
+    });
+
+    prevMaterialsSnapshot = newMats.map(m => JSON.stringify(m));
+}
+
+// İzinler: durum değişikliği
+let prevLeavesSnapshot = null;
+
+function checkLeaveNotifications(newLeaves) {
+    if (!prevLeavesSnapshot) { prevLeavesSnapshot = newLeaves.map(l => JSON.stringify(l)); return; }
+    const prevMap = {};
+    prevLeavesSnapshot.forEach(s => { const l = JSON.parse(s); prevMap[l.id] = l; });
+
+    newLeaves.forEach(l => {
+        const prev = prevMap[l.id];
+        if (!prev) {
+            if (currentRole === 'supervisor' && l.worker !== currentUser) {
+                addAppNotification('leave', 'event', `<b>${l.worker}</b> izin talebinde bulundu.`, 'calendar');
+            }
+        } else if (prev.status !== l.status) {
+            if (currentRole === 'worker' && l.worker === currentUser) {
+                const label = l.status === 'approved' ? 'onaylandı ✅' : l.status === 'rejected' ? 'reddedildi ❌' : l.status;
+                addAppNotification('leave', 'event', `İzin talebiniz ${label}.`, 'calendar');
+            }
+        }
+    });
+
+    prevLeavesSnapshot = newLeaves.map(l => JSON.stringify(l));
+}
+
+// Snapshot listener'lara hook: mevcut listenFor fonksiyonlarını sarmalayalım
+const origListenForTasks = listenForTasks;
+listenForTasks = function () {
+    if (unsubscribe) unsubscribe();
+    const q = window.query(window.collection(window.db, "tasks"), window.orderBy("timestamp", "desc"));
+    unsubscribe = window.onSnapshot(q, (snap) => {
+        tasks = [];
+        snap.forEach(d => tasks.push({ id: d.id, ...d.data() }));
+        checkTaskNotifications(tasks);
+        renderTasks();
+    });
+};
+
+const origListenForMaterials = listenForMaterials;
+listenForMaterials = function () {
+    if (materialsUnsubscribe) materialsUnsubscribe();
+    const q = window.query(window.collection(window.db, "materials"), window.orderBy("timestamp", "desc"));
+    materialsUnsubscribe = window.onSnapshot(q, (snap) => {
+        materials = [];
+        snap.forEach(d => materials.push({ id: d.id, ...d.data() }));
+        checkMaterialNotifications(materials);
+        if (currentRole === 'supervisor') renderSupervisorMaterials();
+        renderWorkerMaterials();
+    });
+};
+
+const origListenForLeaves = listenForLeaves;
+listenForLeaves = function () {
+    if (leavesUnsubscribe) leavesUnsubscribe();
+    const q = window.query(window.collection(window.db, "leaves"), window.orderBy("timestamp", "desc"));
+    leavesUnsubscribe = window.onSnapshot(q, (snap) => {
+        leaves = [];
+        snap.forEach(d => leaves.push({ id: d.id, ...d.data() }));
+        checkLeaveNotifications(leaves);
+        if (currentRole === 'supervisor') renderSupervisorLeaves();
+        if (currentRole === 'worker') renderWorkerLeaves();
+        renderLeaveCalendar();
+    });
+};
+
+// Login olduktan 3sn sonra bildirimleri aktif et (ilk yükleme spam önlemi)
+const origLogin = login;
+login = function (username, role, showWelcome = true) {
+    notifInitialized = false;
+    prevTasksSnapshot = null;
+    prevMaterialsSnapshot = null;
+    prevLeavesSnapshot = null;
+    appNotifications = [];
+    origLogin(username, role, showWelcome);
+    setTimeout(() => { notifInitialized = true; }, 3000);
+};
