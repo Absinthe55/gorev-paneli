@@ -879,6 +879,7 @@ function renderSupervisorTasks() {
                     ${editedHtml}
                 </div>
                 ${imageHtml}${compImgHtml}${matHtml}
+                ${buildTaskCommentsHtml(task)}
                 <div class="task-actions" onclick="event.stopPropagation()">
                     <button class="action-btn danger" onclick="window.deleteTask('${task.id}')">
                         <span class="material-icons-round">delete</span> Sil
@@ -950,6 +951,7 @@ function renderWorkerTasks() {
                     <span class="chip chip-${s.cls}"><span class="material-icons-round">${s.icon}</span> ${s.text}</span>
                 </div>
                 ${imageHtml}${compImgHtml}
+                ${buildTaskCommentsHtml(task)}
                 ${actionsHtml}
             </div>
         `);
@@ -1035,6 +1037,81 @@ window.saveEditComment = async function (materialId, commentIndex, comment, newT
     } catch (e) { showToast('Güncellenemedi.', 'error'); }
 };
 
+// ─── GÖREV YORUMLARI ────────────────────────────────────────
+
+window.addTaskComment = async function (taskId) {
+    const input = document.getElementById(`tc-${taskId}`);
+    if (!input || !input.value.trim()) return;
+    const commentText = input.value.trim();
+    try {
+        const task = tasks.find(t => t.id === taskId);
+        const comments = task ? (task.comments || []) : [];
+        comments.push({ author: currentUser, role: currentRole, text: commentText, ts: new Date().toISOString() });
+        await window.updateDoc(window.doc(window.db, 'tasks', taskId), { comments });
+        input.value = '';
+        showToast('Yorum eklendi.', 'chat');
+
+        // Telegram bildirimi
+        if (task) {
+            const taskName = task.title || 'Görev';
+            if (currentRole === 'worker') {
+                await sendTelegramNotification(
+                    SUPERVISOR_CHAT_ID,
+                    `💬 <b>Titan Makina - Görev Yorumu</b>\n\n👷 <b>${currentUser}</b>, "<b>${taskName}</b>" görevine yorum yazdı:\n\n"${commentText}"`
+                );
+            } else if (currentRole === 'supervisor') {
+                const workerChatId = getWorkerChatId(task.worker);
+                await sendTelegramNotification(
+                    workerChatId,
+                    `💬 <b>Titan Makina - Görev Yorumu</b>\n\n🔔 "<b>${taskName}</b>" görevinize amir yorum yazdı:\n\n"${commentText}"`
+                );
+            }
+        }
+    } catch (e) { showToast('Yorum eklenemedi.', 'error'); }
+};
+
+window.editTaskComment = function (taskId, commentIndex) {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task || !task.comments || !task.comments[commentIndex]) return;
+    const comment = task.comments[commentIndex];
+    if (comment.author !== currentUser) { showToast('Sadece kendi yorumunuzu düzenleyebilirsiniz.', 'error'); return; }
+    const newText = prompt('Yorumu düzenle:', comment.text);
+    if (newText === null || !newText.trim() || newText.trim() === comment.text) return;
+    window.saveEditTaskComment(taskId, commentIndex, comment, newText.trim());
+};
+
+window.saveEditTaskComment = async function (taskId, commentIndex, comment, newText) {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    const comments = [...(task.comments || [])];
+    const updated = { ...comments[commentIndex], text: newText, editedAt: new Date().toISOString() };
+    if (!updated.originalText) updated.originalText = comment.text;
+    comments[commentIndex] = updated;
+    try {
+        await window.updateDoc(window.doc(window.db, 'tasks', taskId), { comments });
+        showToast('Yorum güncellendi.', 'edit');
+    } catch (e) { showToast('Güncellenemedi.', 'error'); }
+};
+
+function buildTaskCommentsHtml(task) {
+    const commentsHtml = (task.comments || []).map((c, idx) => {
+        const commentTime = c.ts ? `<span style="font-size:0.7rem;color:var(--clr-text-muted);margin-left:5px">(${new Date(c.ts).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })})</span>` : '';
+        const origHtml = c.originalText
+            ? `<span style="font-size:.75rem;color:var(--clr-text-muted);opacity:.65;margin-left:.3rem">(önceki: ${c.originalText})</span>`
+            : '';
+        const editIcon = c.author === currentUser
+            ? `<span class="material-icons-round" style="font-size:.8rem;vertical-align:middle;color:var(--clr-primary);cursor:pointer;margin-left:.4rem" onclick="event.stopPropagation();window.editTaskComment('${task.id}',${idx})" title="Düzenle">edit</span>`
+            : '';
+        return `<div class="comment ${c.role}"><strong>${c.author}:</strong> ${c.text} ${origHtml}${editIcon}${commentTime}</div>`;
+    }).join('');
+
+    return `
+        <div class="comments-section">${commentsHtml}</div>
+        <div class="comment-form" onclick="event.stopPropagation()">
+            <input type="text" class="comment-input" id="tc-${task.id}" placeholder="Yorum ekle...">
+            <button class="action-btn" onclick="window.addTaskComment('${task.id}')"><span class="material-icons-round">send</span></button>
+        </div>`;
+}
 
 window.previewCompleteImage = function (input, taskId) {
     const file = input.files[0];
