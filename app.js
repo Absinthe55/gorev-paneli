@@ -162,6 +162,9 @@ window.saveWorkerTelegramId = async function () {
 
 // ─── PRESENCE / ONLINE STATUS ───────────────────────────────
 
+const PRESENCE_HEARTBEAT_MS = 30000;  // 30 saniye
+const PRESENCE_STALE_MS = 90000;      // 90 saniye → bu süreden eski lastSeen = offline kabul
+
 function formatLastSeen(ts) {
     if (!ts) return 'Hiç giriş yapmadı';
     const diff = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
@@ -169,6 +172,14 @@ function formatLastSeen(ts) {
     if (diff < 3600) return `${Math.floor(diff / 60)} dakika önce`;
     if (diff < 86400) return `${Math.floor(diff / 3600)} saat önce`;
     return `${Math.floor(diff / 86400)} gün önce`;
+}
+
+// Kullanıcının gerçekten çevrimiçi olup olmadığını kontrol et (isOnline + lastSeen tazeliği)
+function isUserTrulyOnline(user) {
+    if (!user.isOnline) return false;
+    if (!user.lastSeen) return false;
+    const elapsed = Date.now() - new Date(user.lastSeen).getTime();
+    return elapsed < PRESENCE_STALE_MS;
 }
 
 async function setUserPresence(isOnline) {
@@ -185,7 +196,7 @@ async function setUserPresence(isOnline) {
 function startPresenceHeartbeat() {
     stopPresenceHeartbeat();
     setUserPresence(true);
-    presenceInterval = setInterval(() => setUserPresence(true), 60000);
+    presenceInterval = setInterval(() => setUserPresence(true), PRESENCE_HEARTBEAT_MS);
 }
 
 function stopPresenceHeartbeat() {
@@ -209,15 +220,44 @@ function listenForUsers() {
     });
 }
 
-// Sekme/tarayıcı kapanırken offline işaretle
+// Sekme/tarayıcı kapanırken offline işaretle (fetch + keepalive, sendBeacon yerine)
 window.addEventListener('beforeunload', () => {
     const me = systemUsers.find(u => u.name === currentUser);
     if (!me) return;
-    // sendBeacon, async updateDoc yerine kullanılır (sayfa kapanırken çalışır)
-    const url = `https://firestore.googleapis.com/v1/projects/${window.db.app.options.projectId}/databases/(default)/documents/users/${me.id}?updateMask.fieldPaths=isOnline&updateMask.fieldPaths=lastSeen`;
-    const body = JSON.stringify({ fields: { isOnline: { booleanValue: false }, lastSeen: { stringValue: new Date().toISOString() } } });
-    navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }));
+    stopPresenceHeartbeat();
+    // fetch keepalive: PATCH metodu destekler (sendBeacon yalnızca POST destekliyor)
+    try {
+        const url = `https://firestore.googleapis.com/v1/projects/${window.db.app.options.projectId}/databases/(default)/documents/users/${me.id}?updateMask.fieldPaths=isOnline&updateMask.fieldPaths=lastSeen`;
+        const body = JSON.stringify({ fields: { isOnline: { booleanValue: false }, lastSeen: { stringValue: new Date().toISOString() } } });
+        fetch(url, { method: 'PATCH', body, headers: { 'Content-Type': 'application/json' }, keepalive: true }).catch(() => {});
+    } catch (e) { /* silent */ }
 });
+
+// Sekme gizlendiğinde/gösterildiğinde presence güncellemesi (mobil kilit ekranı, sekme değiştirme)
+document.addEventListener('visibilitychange', () => {
+    if (!currentUser) return;
+    if (document.visibilityState === 'hidden') {
+        // Kullanıcı sekmeyi terk etti — heartbeat durdur, offline işaretle
+        stopPresenceHeartbeat();
+        setUserPresence(false);
+    } else {
+        // Kullanıcı geri geldi — tekrar online yap
+        startPresenceHeartbeat();
+    }
+});
+
+// Ekip sekmesi açıkken her 30sn'de bir render et (formatLastSeen güncellenmesi ve staleness kontrolü için)
+let presenceRefreshInterval = null;
+function startPresenceRefresh() {
+    stopPresenceRefresh();
+    presenceRefreshInterval = setInterval(() => {
+        if (currentRole === 'supervisor') renderSystemUsers();
+    }, PRESENCE_HEARTBEAT_MS);
+}
+function stopPresenceRefresh() {
+    if (presenceRefreshInterval) { clearInterval(presenceRefreshInterval); presenceRefreshInterval = null; }
+}
+
 
 // ─── ADD TASK ───────────────────────────────────────────────
 
@@ -609,12 +649,14 @@ function login(username, role, showWelcome = true) {
     listenForMaterials();
     listenForDocuments();
     listenForUsers();
-    // Presence: biraz bekle systemUsers yüklensın
+    startPresenceRefresh();
+    // Presence: biraz bekle systemUsers yüklensin
     setTimeout(() => startPresenceHeartbeat(), 1500);
 }
 
 function logout() {
     stopPresenceHeartbeat();
+    stopPresenceRefresh();
     setUserPresence(false);
     currentUser = null; currentRole = null;
     localStorage.removeItem('titan_user'); localStorage.removeItem('titan_role');
@@ -1661,8 +1703,8 @@ function renderSystemUsers() {
             ? `<span style="color:var(--clr-success);font-size:.78rem">✅ ${tgId}</span>`
             : `<span style="color:var(--clr-text-muted);font-size:.78rem">Ayarlanmamış</span>`;
 
-        // Çevrimiçi durumu
-        const isOnline = u.isOnline === true;
+        // Çevrimiçi durumu (staleness check: lastSeen 90sn'den eski ise offline kabul)
+        const isOnline = isUserTrulyOnline(u);
         const lastSeenText = isOnline ? 'Çevrimiçi' : formatLastSeen(u.lastSeen);
         const onlineDot = isOnline
             ? `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#10b981;box-shadow:0 0 6px #10b981;flex-shrink:0"></span>`
