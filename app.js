@@ -476,6 +476,15 @@ async function init() {
 
     // Yalnızca kullanıcı bilgilerini çek
     await fetchUsers();
+
+    // "Beni Hatırla" ile kayıtlı kullanıcı varsa otomatik giriş yap
+    const remembered = systemUsers.find(u => {
+        const savedPass = localStorage.getItem(`remember_${u.name}`);
+        return savedPass && savedPass === u.password;
+    });
+    if (remembered) {
+        login(remembered.name, remembered.role, false);
+    }
 }
 
 async function fetchUsers() {
