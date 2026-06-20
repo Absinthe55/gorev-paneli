@@ -135,7 +135,7 @@
                 <!-- Yeni Görev Formu -->
                 <section class="add-task-section glass-panel">
                     <h3><span class="material-icons-round">add_task</span> Yeni Görev Ver</h3>
-                    <form id="add-task-form" onsubmit="event.preventDefault(); return false;">
+                    <form id="add-task-form" onsubmit="event.preventDefault(); window.handleAddTaskSubmit();">
                         <div class="input-group dark">
                             <span class="material-icons-round">assignment</span>
                             <input type="text" id="task-title" placeholder="Görev başlığı / tanımı" required>
@@ -217,7 +217,7 @@
             <div id="sup-tab-docs" class="tab-content">
                 <section class="glass-panel">
                     <h3><span class="material-icons-round">folder</span> Döküman Yönetimi</h3>
-                    <form id="docs-form" style="margin-bottom:1rem" onsubmit="event.preventDefault(); return false;">
+                    <form id="docs-form" style="margin-bottom:1rem" onsubmit="event.preventDefault(); window.handleDocsSubmit();">
                         <div class="input-group dark">
                             <span class="material-icons-round">title</span>
                             <input type="text" id="doc-title" placeholder="Döküman Adı/Başlığı" required>
@@ -318,7 +318,7 @@
             <div id="wrk-tab-calendar" class="tab-content">
                 <section class="leave-request-section glass-panel">
                     <h3><span class="material-icons-round">flight_takeoff</span> Yıllık İzin Talep Et</h3>
-                    <form id="leave-form" onsubmit="event.preventDefault(); return false;">
+                    <form id="leave-form" onsubmit="event.preventDefault(); window.handleLeaveSubmit();">
                         <label class="date-label">Başlangıç Tarihi</label>
                         <div class="input-group dark">
                             <span class="material-icons-round">calendar_today</span>
@@ -357,7 +357,7 @@
             <div id="wrk-tab-overtime" class="tab-content">
                 <section class="leave-request-section glass-panel">
                     <h3><span class="material-icons-round">more_time</span> Mesai Talep Et</h3>
-                    <form id="overtime-form" onsubmit="event.preventDefault(); return false;">
+                    <form id="overtime-form" onsubmit="event.preventDefault(); window.handleOvertimeSubmit();">
                         <label class="date-label">Mesai Tarihi</label>
                         <div class="input-group dark">
                             <span class="material-icons-round">calendar_today</span>
@@ -391,7 +391,7 @@
             <div id="wrk-tab-materials" class="tab-content">
                 <section class="glass-panel">
                     <h3><span class="material-icons-round">inventory_2</span> Eksik Malzeme Bildir</h3>
-                    <form id="material-form" onsubmit="event.preventDefault(); return false;">
+                    <form id="material-form" onsubmit="event.preventDefault(); window.handleMaterialSubmit();">
                         <div class="input-group dark">
                             <span class="material-icons-round">search</span>
                             <input type="text" id="material-name" placeholder="Eksik malzeme adı" required>
@@ -454,7 +454,7 @@
         // Set workerSrc for pdf.js
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
     </script>
-    <script src="app.js?v=3.0"></script>
+    <script src="app.js?v=4.0"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, query, orderBy, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";

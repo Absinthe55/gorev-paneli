@@ -264,251 +264,241 @@ function stopPresenceRefresh() {
 
 // ─── ADD TASK ───────────────────────────────────────────────
 
-if (addTaskForm) {
-    addTaskForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const title = document.getElementById('task-title').value.trim();
-        const worker = document.getElementById('worker-select').value;
-        const priority = document.querySelector('input[name="priority"]:checked').value;
-        const file = taskImageInput ? taskImageInput.files[0] : null;
-        if (title && worker) {
-            submitTaskBtn.disabled = true;
-            submitTaskBtn.innerHTML = '<span class="material-icons-round spinning">sync</span> Yükleniyor...';
-            await addTask(title, worker, priority, file);
-            addTaskForm.reset();
-            if (imagePreview) { imagePreview.style.display = 'none'; imagePreview.src = ''; }
-            if (fileNameDisplay) fileNameDisplay.textContent = 'Fotoğraf Ekle (Opsiyonel)';
-            submitTaskBtn.disabled = false;
-            submitTaskBtn.innerHTML = '<span class="material-icons-round">send</span> Görevi Ata';
-        }
-    });
-}
+window.handleAddTaskSubmit = async function() {
+    const title = document.getElementById('task-title').value.trim();
+    const worker = document.getElementById('worker-select').value;
+    const priority = document.querySelector('input[name="priority"]:checked').value;
+    const file = taskImageInput ? taskImageInput.files[0] : null;
+    if (title && worker) {
+        submitTaskBtn.disabled = true;
+        submitTaskBtn.innerHTML = '<span class="material-icons-round spinning">sync</span> Yükleniyor...';
+        await addTask(title, worker, priority, file);
+        const addTaskForm = document.getElementById('add-task-form');
+        if (addTaskForm) addTaskForm.reset();
+        if (imagePreview) { imagePreview.style.display = 'none'; imagePreview.src = ''; }
+        if (fileNameDisplay) fileNameDisplay.textContent = 'Fotoğraf Ekle (Opsiyonel)';
+        submitTaskBtn.disabled = false;
+        submitTaskBtn.innerHTML = '<span class="material-icons-round">send</span> Görevi Ata';
+    }
+};
 
 // ─── LEAVE FORM ─────────────────────────────────────────────
 
-if (leaveForm) {
-    leaveForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const btn = document.getElementById('submit-leave-btn');
-        const start = document.getElementById('leave-start').value;
-        const end = document.getElementById('leave-end').value;
-        if (!start || !end) return;
-        btn.disabled = true;
-        btn.innerHTML = '<span class="material-icons-round spinning">sync</span> Gönderiliyor...';
-        try {
-            await window.addDoc(window.collection(window.db, "leaves"), {
-                worker: currentUser, start, end, status: 'pending',
-                timestamp: new Date().toISOString()
-            });
-            showToast('İzin talebi gönderildi.', 'event_available');
-            leaveForm.reset();
-            renderLeaveCalendar();
-            // Telegram: Amire izin talebi bildirimi
-            const startFmt = new Date(start).toLocaleDateString('tr-TR');
-            const endFmt = new Date(end).toLocaleDateString('tr-TR');
-            await sendTelegramNotification(
-                SUPERVISOR_CHAT_ID,
-                `📅 <b>Titan Makina - İzin Talebi</b>\n\n👷 <b>${currentUser}</b> izin talebinde bulundu.\n🗓 ${startFmt} → ${endFmt}\n\nLütfen uygulamayı kontrol edin.`
-            );
-        } catch (e) {
-            showToast('İzin talebi gönderilemedi.', 'error');
-        }
-        btn.disabled = false;
-        btn.innerHTML = '<span class="material-icons-round">send</span> İzin Talebi Gönder';
-    });
-}
+window.handleLeaveSubmit = async function() {
+    const btn = document.getElementById('submit-leave-btn');
+    const start = document.getElementById('leave-start').value;
+    const end = document.getElementById('leave-end').value;
+    if (!start || !end) return;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons-round spinning">sync</span> Gönderiliyor...';
+    try {
+        await window.addDoc(window.collection(window.db, "leaves"), {
+            worker: currentUser, start, end, status: 'pending',
+            timestamp: new Date().toISOString()
+        });
+        showToast('İzin talebi gönderildi.', 'event_available');
+        const leaveForm = document.getElementById('leave-form');
+        if (leaveForm) leaveForm.reset();
+        renderLeaveCalendar();
+        // Telegram: Amire izin talebi bildirimi
+        const startFmt = new Date(start).toLocaleDateString('tr-TR');
+        const endFmt = new Date(end).toLocaleDateString('tr-TR');
+        await sendTelegramNotification(
+            SUPERVISOR_CHAT_ID,
+            `📅 <b>Titan Makina - İzin Talebi</b>\n\n👷 <b>${currentUser}</b> izin talebinde bulundu.\n🗓 ${startFmt} → ${endFmt}\n\nLütfen uygulamayı kontrol edin.`
+        );
+    } catch (e) {
+        showToast('İzin talebi gönderilemedi.', 'error');
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-round">send</span> İzin Talebi Gönder';
+};
 
 // ─── OVERTIME FORM ──────────────────────────────────────────
 
-if (overtimeForm) {
-    overtimeForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const btn = document.getElementById('submit-overtime-btn');
-        const date = document.getElementById('overtime-date').value;
-        const reason = document.getElementById('overtime-reason').value;
-        const decision = document.getElementById('overtime-decision').value;
-        if (!date) return;
-        btn.disabled = true;
-        btn.innerHTML = '<span class="material-icons-round spinning">sync</span> Gönderiliyor...';
-        try {
-            await window.addDoc(window.collection(window.db, "overtimes"), {
-                worker: currentUser, date, reason, decision, status: 'pending',
-                timestamp: new Date().toISOString()
-            });
-            showToast('Mesai durumu gönderildi.', 'event_available');
-            overtimeForm.reset();
-            const dateInput = document.getElementById('overtime-date');
-            if (dateInput) {
-                dateInput.value = new Date().toISOString().split('T')[0];
-            }
-            // Telegram: Amire mesai talebi bildirimi
-            const dateFmt = new Date(date).toLocaleDateString('tr-TR');
-            const reasonText = reason ? `\n📝 ${reason}` : '';
-            const decisionText = decision === 'will_stay' ? '✅ Kalacak' : '❌ Kalmayacak';
-            await sendTelegramNotification(
-                SUPERVISOR_CHAT_ID,
-                `🕒 <b>Titan Makina - Mesai Bildirimi</b>\n\n👷 <b>${currentUser}</b> mesai durumu bildirdi.\n🗓 ${dateFmt}\n📌 Durum: <b>${decisionText}</b>${reasonText}\n\nLütfen uygulamayı kontrol edin.`
-            );
-        } catch (e) {
-            showToast('Mesai bildirim gönderilemedi.', 'error');
+window.handleOvertimeSubmit = async function() {
+    const btn = document.getElementById('submit-overtime-btn');
+    const date = document.getElementById('overtime-date').value;
+    const reason = document.getElementById('overtime-reason').value;
+    const decision = document.getElementById('overtime-decision').value;
+    if (!date) return;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons-round spinning">sync</span> Gönderiliyor...';
+    try {
+        await window.addDoc(window.collection(window.db, "overtimes"), {
+            worker: currentUser, date, reason, decision, status: 'pending',
+            timestamp: new Date().toISOString()
+        });
+        showToast('Mesai durumu gönderildi.', 'event_available');
+        const overtimeForm = document.getElementById('overtime-form');
+        if (overtimeForm) overtimeForm.reset();
+        const dateInput = document.getElementById('overtime-date');
+        if (dateInput) {
+            dateInput.value = new Date().toISOString().split('T')[0];
         }
-        btn.disabled = false;
-        btn.innerHTML = '<span class="material-icons-round">send</span> Mesai Talebi Gönder';
-    });
-}
+        // Telegram: Amire mesai talebi bildirimi
+        const dateFmt = new Date(date).toLocaleDateString('tr-TR');
+        const reasonText = reason ? `\n📝 ${reason}` : '';
+        const decisionText = decision === 'will_stay' ? '✅ Kalacak' : '❌ Kalmayacak';
+        await sendTelegramNotification(
+            SUPERVISOR_CHAT_ID,
+            `🕒 <b>Titan Makina - Mesai Bildirimi</b>\n\n👷 <b>${currentUser}</b> mesai durumu bildirdi.\n🗓 ${dateFmt}\n📌 Durum: <b>${decisionText}</b>${reasonText}\n\nLütfen uygulamayı kontrol edin.`
+        );
+    } catch (e) {
+        showToast('Mesai bildirim gönderilemedi.', 'error');
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-round">send</span> Mesai Talebi Gönder';
+};
 
 // ─── MATERIAL FORM ──────────────────────────────────────────
 
-if (materialForm) {
-    materialForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const btn = document.getElementById('submit-material-btn');
-        const name = document.getElementById('material-name').value.trim();
-        const desc = document.getElementById('material-desc').value.trim();
-        if (!name) return;
-        btn.disabled = true;
-        btn.innerHTML = '<span class="material-icons-round spinning">sync</span> Gönderiliyor...';
+window.handleMaterialSubmit = async function() {
+    const btn = document.getElementById('submit-material-btn');
+    const name = document.getElementById('material-name').value.trim();
+    const desc = document.getElementById('material-desc').value.trim();
+    if (!name) return;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons-round spinning">sync</span> Gönderiliyor...';
 
-        let imageUrl = null;
-        const fileInput = document.getElementById('material-image');
-        if (fileInput && fileInput.files[0]) {
-            try { imageUrl = await compressImage(fileInput.files[0]); }
-            catch (e) { showToast('Resim işleme hatası!', 'error'); }
-        }
+    let imageUrl = null;
+    const fileInput = document.getElementById('material-image');
+    if (fileInput && fileInput.files[0]) {
+        try { imageUrl = await compressImage(fileInput.files[0]); }
+        catch (e) { showToast('Resim işleme hatası!', 'error'); }
+    }
 
-        try {
-            await window.addDoc(window.collection(window.db, "materials"), {
-                worker: currentUser,
-                name,
-                desc,
-                imageUrl,
-                status: 'pending',
-                comments: [],
-                timestamp: new Date().toISOString()
-            });
-            showToast('Malzeme talebi gönderildi.', 'inventory_2');
-            materialForm.reset();
-            const nameEl = document.getElementById('mat-file-name-display');
-            const prevEl = document.getElementById('mat-image-preview');
-            if (nameEl) nameEl.textContent = 'Fotoğraf Ekle (Opsiyonel)';
-            if (prevEl) { prevEl.src = ''; prevEl.style.display = 'none'; }
-            // Telegram: Amire malzeme talebi bildirimi
-            await sendTelegramNotification(
-                SUPERVISOR_CHAT_ID,
-                `📦 <b>Titan Makina - Malzeme Talebi</b>\n\n👷 <b>${currentUser}</b> malzeme talep etti.\n📋 <b>${name}</b>${desc ? '\n📝 ' + desc : ''}\n\nLütfen uygulamayı kontrol edin.`
-            );
-        } catch (e) {
-            showToast('Talep gönderilemedi.', 'error');
-        }
-        btn.disabled = false;
-        btn.innerHTML = '<span class="material-icons-round">send</span> Talep Gönder';
-    });
-}
+    try {
+        await window.addDoc(window.collection(window.db, "materials"), {
+            worker: currentUser,
+            name,
+            desc,
+            imageUrl,
+            status: 'pending',
+            comments: [],
+            timestamp: new Date().toISOString()
+        });
+        showToast('Malzeme talebi gönderildi.', 'inventory_2');
+        const materialForm = document.getElementById('material-form');
+        if (materialForm) materialForm.reset();
+        const nameEl = document.getElementById('mat-file-name-display');
+        const prevEl = document.getElementById('mat-image-preview');
+        if (nameEl) nameEl.textContent = 'Fotoğraf Ekle (Opsiyonel)';
+        if (prevEl) { prevEl.src = ''; prevEl.style.display = 'none'; }
+        // Telegram: Amire malzeme talebi bildirimi
+        await sendTelegramNotification(
+            SUPERVISOR_CHAT_ID,
+            `📦 <b>Titan Makina - Malzeme Talebi</b>\n\n👷 <b>${currentUser}</b> malzeme talep etti.\n📋 <b>${name}</b>${desc ? '\n📝 ' + desc : ''}\n\nLütfen uygulamayı kontrol edin.`
+        );
+    } catch (e) {
+        showToast('Talep gönderilemedi.', 'error');
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-round">send</span> Talep Gönder';
+};
 
 // ─── DOCUMENTS FORM ─────────────────────────────────────────
 
-if (docsForm) {
-    docsForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const btn = document.getElementById('submit-doc-btn');
-        const title = document.getElementById('doc-title').value.trim();
-        const fileInput = document.getElementById('doc-file');
-        const file = fileInput.files[0];
-        if (!title || !file) return;
+window.handleDocsSubmit = async function() {
+    const btn = document.getElementById('submit-doc-btn');
+    const title = document.getElementById('doc-title').value.trim();
+    const fileInput = document.getElementById('doc-file');
+    const file = fileInput.files[0];
+    if (!title || !file) return;
 
-        btn.disabled = true;
-        btn.innerHTML = '<span class="material-icons-round spinning">sync</span> Yükleniyor...';
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons-round spinning">sync</span> Yükleniyor...';
 
-        const timeoutPromise = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error("İşlem zaman aşımına uğradı (Bağlantı veya Yetki sorunu).")), ms));
+    const timeoutPromise = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error("İşlem zaman aşımına uğradı (Bağlantı veya Yetki sorunu).")), ms));
 
-        try {
-            console.log("Documents upload started for:", file.name);
-            const fileName = `documents/${Date.now()}_${file.name}`;
+    try {
+        console.log("Documents upload started for:", file.name);
+        const fileName = `documents/${Date.now()}_${file.name}`;
 
-            let downloadUrls = [];
+        let downloadUrls = [];
 
-            if (file.type === 'application/pdf') {
-                btn.innerHTML = '<span class="material-icons-round spinning">sync</span> PDF sayfaları resme çevriliyor...';
+        if (file.type === 'application/pdf') {
+            btn.innerHTML = '<span class="material-icons-round spinning">sync</span> PDF sayfaları resme çevriliyor...';
 
-                try {
-                    const arrayBuffer = await file.arrayBuffer();
-                    console.log("ArrayBuffer loaded, passing to pdf.js...");
-                    const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-                    console.log("PDF parsed successfully. Total pages:", pdf.numPages);
-                    const totalPages = pdf.numPages;
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                console.log("ArrayBuffer loaded, passing to pdf.js...");
+                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                console.log("PDF parsed successfully. Total pages:", pdf.numPages);
+                const totalPages = pdf.numPages;
 
-                    for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-                        btn.innerHTML = `<span class="material-icons-round spinning">sync</span> Sayfa işleniyor (${pageNum}/${totalPages})...`;
-                        const page = await pdf.getPage(pageNum);
-                        const viewport = page.getViewport({ scale: 1.0 }); // Lower scale to avoid Firestore 1MB doc limit
+                for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+                    btn.innerHTML = `<span class="material-icons-round spinning">sync</span> Sayfa işleniyor (${pageNum}/${totalPages})...`;
+                    const page = await pdf.getPage(pageNum);
+                    const viewport = page.getViewport({ scale: 1.0 }); // Lower scale to avoid Firestore 1MB doc limit
 
-                        const canvas = document.createElement('canvas');
-                        const ctx = canvas.getContext('2d');
-                        canvas.height = viewport.height;
-                        canvas.width = viewport.width;
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
 
-                        await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+                    await page.render({ canvasContext: ctx, viewport: viewport }).promise;
 
-                        // Create smaller base64 string
-                        const dataUrl = canvas.toDataURL('image/jpeg', 0.50);
-                        downloadUrls.push(dataUrl);
-                        console.log(`Page ${pageNum} rendered and converted to base64. Size: ~${Math.round(dataUrl.length / 1024)}KB`);
-                    }
-                } catch (pdfErr) {
-                    console.error("PDF İşleme Hatası:", pdfErr);
-                    throw new Error("PDF dosyası okunamadı veya bozuk: " + pdfErr.message);
+                    // Create smaller base64 string
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.50);
+                    downloadUrls.push(dataUrl);
+                    console.log(`Page ${pageNum} rendered and converted to base64. Size: ~${Math.round(dataUrl.length / 1024)}KB`);
                 }
-            } else {
-                // Regular Image 
-                btn.innerHTML = `<span class="material-icons-round spinning">sync</span> Resim işleniyor...`;
-                console.log("Compressing standard image...");
-                const dataUrl = await compressImage(file, 1000); // 1000px max width
-                downloadUrls.push(dataUrl);
-                console.log(`Image compressed explicitly. Size: ~${Math.round(dataUrl.length / 1024)}KB`);
+            } catch (pdfErr) {
+                console.error("PDF İşleme Hatası:", pdfErr);
+                throw new Error("PDF dosyası okunamadı veya bozuk: " + pdfErr.message);
             }
-
-            console.log("Adding doc to Firestore...");
-            btn.innerHTML = '<span class="material-icons-round spinning">sync</span> Sisteme kaydediliyor...';
-
-            // Firestore tek bir dökümanda en fazla 1 MiB saklayabilir. 
-            // Eğer PDF çok sayfalıysa (Örn 10+ sayfa) Base64 stringler toplamı 1MB sınırını aşar ve addDoc donar.
-            let totalSize = downloadUrls.reduce((acc, curr) => acc + curr.length, 0);
-            console.log("Total Firestore Payload Size: ~" + Math.round(totalSize / 1024) + " KB");
-            if (totalSize > 900000) {
-                throw new Error("Dosya boyutu veya sayfa sayısı veritabanı limitini aşıyor. Lütfen daha az sayfalı veya daha düşük boyutlu/çözünürlüklü bir dosya seçin.");
-            }
-
-            await Promise.race([
-                window.addDoc(window.collection(window.db, "documents"), {
-                    title,
-                    urls: downloadUrls, // Artık bir dizi olarak kaydediyoruz
-                    uploader: currentUser,
-                    timestamp: new Date().toISOString()
-                }),
-                timeoutPromise(10000)
-            ]);
-
-            showToast('Döküman başarıyla yüklendi.', 'cloud_done');
-            docsForm.reset();
-            const docNameEl = document.getElementById('doc-file-name-display');
-            if (docNameEl) docNameEl.textContent = 'Dosya Seç (Sadece PDF, PNG, JPG)';
-        } catch (err) {
-            console.error("Döküman yükleme hatası detayları:", err);
-            // Firebase Storage kuralları veya kapalı olması gibi durumlarda hatayı gösterelim
-            let errMsg = 'Döküman yüklenemedi!';
-            if (err.message && err.message.includes("zaman aşımına")) {
-                errMsg = 'Firebase bağlantısı koptu veya Storage kapalı.';
-                alert("Hata: Firebase Storage henüz projenizde aktif edilmemiş olabilir veya bağlantınız yavaş. Lütfen Firebase Console üzerinden Build > Storage bölümüne girip servisi başlattığınızdan emin olun.");
-            } else if (err.code && err.code.includes("unauthorized")) {
-                alert("Hata: Firebase Storage güvenlik kuralları izinsiz (unauthorized) yüklemeye izin vermiyor. Firebase Console > Storage > Rules bölümünde allow write izni vermelisiniz.");
-            }
-            showToast(errMsg, 'error');
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = '<span class="material-icons-round">cloud_upload</span> Dökümanı Yükle';
+        } else {
+            // Regular Image 
+            btn.innerHTML = `<span class="material-icons-round spinning">sync</span> Resim işleniyor...`;
+            console.log("Compressing standard image...");
+            const dataUrl = await compressImage(file, 1000); // 1000px max width
+            downloadUrls.push(dataUrl);
+            console.log(`Image compressed explicitly. Size: ~${Math.round(dataUrl.length / 1024)}KB`);
         }
-    });
-}
+
+        console.log("Adding doc to Firestore...");
+        btn.innerHTML = '<span class="material-icons-round spinning">sync</span> Sisteme kaydediliyor...';
+
+        // Firestore tek bir dökümanda en fazla 1 MiB saklayabilir. 
+        // Eğer PDF çok sayfalıysa (Örn 10+ sayfa) Base64 stringler toplamı 1MB sınırını aşar ve addDoc donar.
+        let totalSize = downloadUrls.reduce((acc, curr) => acc + curr.length, 0);
+        console.log("Total Firestore Payload Size: ~" + Math.round(totalSize / 1024) + " KB");
+        if (totalSize > 900000) {
+            throw new Error("Dosya boyutu veya sayfa sayısı veritabanı limitini aşıyor. Lütfen daha az sayfalı veya daha düşük boyutlu/çözünürlüklü bir dosya seçin.");
+        }
+
+        await Promise.race([
+            window.addDoc(window.collection(window.db, "documents"), {
+                title,
+                urls: downloadUrls, // Artık bir dizi olarak kaydediyoruz
+                uploader: currentUser,
+                timestamp: new Date().toISOString()
+            }),
+            timeoutPromise(10000)
+        ]);
+
+        showToast('Döküman başarıyla yüklendi.', 'cloud_done');
+        const docsForm = document.getElementById('docs-form');
+        if (docsForm) docsForm.reset();
+        const docNameEl = document.getElementById('doc-file-name-display');
+        if (docNameEl) docNameEl.textContent = 'Dosya Seç (Sadece PDF, PNG, JPG)';
+    } catch (err) {
+        console.error("Döküman yükleme hatası detayları:", err);
+        // Firebase Storage kuralları veya kapalı olması gibi durumlarda hatayı gösterelim
+        let errMsg = 'Döküman yüklenemedi!';
+        if (err.message && err.message.includes("zaman aşımına")) {
+            errMsg = 'Firebase bağlantısı koptu veya Storage kapalı.';
+            alert("Hata: Firebase Storage henüz projenizde aktif edilmemiş olabilir veya bağlantınız yavaş. Lütfen Firebase Console üzerinden Build > Storage bölümüne girip servisi başlattığınızdan emin olun.");
+        } else if (err.code && err.code.includes("unauthorized")) {
+            alert("Hata: Firebase Storage güvenlik kuralları izinsiz (unauthorized) yüklemeye izin vermiyor. Firebase Console > Storage > Rules bölümünde allow write izni vermelisiniz.");
+        }
+        showToast(errMsg, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-icons-round">cloud_upload</span> Dökümanı Yükle';
+    }
+};
 
 // ─── LOGOUT ─────────────────────────────────────────────────
 
