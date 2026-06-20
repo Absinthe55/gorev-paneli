@@ -135,7 +135,7 @@
                 <!-- Yeni Görev Formu -->
                 <section class="add-task-section glass-panel">
                     <h3><span class="material-icons-round">add_task</span> Yeni Görev Ver</h3>
-                    <form id="add-task-form" onsubmit="event.preventDefault(); window.handleAddTaskSubmit();">
+                    <form id="add-task-form">
                         <div class="input-group dark">
                             <span class="material-icons-round">assignment</span>
                             <input type="text" id="task-title" placeholder="Görev başlığı / tanımı" required>
@@ -160,7 +160,7 @@
                             </label>
                             <img id="image-preview" class="image-preview" style="display:none">
                         </div>
-                        <button type="submit" class="btn primary-btn" id="submit-task-btn">
+                        <button type="button" onclick="window.handleAddTaskSubmit()" class="btn primary-btn" id="submit-task-btn">
                             <span class="material-icons-round">send</span> Görevi Ata
                         </button>
                     </form>
@@ -217,7 +217,7 @@
             <div id="sup-tab-docs" class="tab-content">
                 <section class="glass-panel">
                     <h3><span class="material-icons-round">folder</span> Döküman Yönetimi</h3>
-                    <form id="docs-form" style="margin-bottom:1rem" onsubmit="event.preventDefault(); window.handleDocsSubmit();">
+                    <form id="docs-form" style="margin-bottom:1rem">
                         <div class="input-group dark">
                             <span class="material-icons-round">title</span>
                             <input type="text" id="doc-title" placeholder="Döküman Adı/Başlığı" required>
@@ -229,7 +229,7 @@
                                 <span id="doc-file-name-display">Dosya Seç (Sadece PDF, PNG, JPG)</span>
                             </label>
                         </div>
-                        <button type="submit" class="btn primary-btn" id="submit-doc-btn">
+                        <button type="button" onclick="window.handleDocsSubmit()" class="btn primary-btn" id="submit-doc-btn">
                             <span class="material-icons-round">cloud_upload</span> Dökümanı Yükle
                         </button>
                     </form>
@@ -318,7 +318,7 @@
             <div id="wrk-tab-calendar" class="tab-content">
                 <section class="leave-request-section glass-panel">
                     <h3><span class="material-icons-round">flight_takeoff</span> Yıllık İzin Talep Et</h3>
-                    <form id="leave-form" onsubmit="event.preventDefault(); window.handleLeaveSubmit();">
+                    <form id="leave-form">
                         <label class="date-label">Başlangıç Tarihi</label>
                         <div class="input-group dark">
                             <span class="material-icons-round">calendar_today</span>
@@ -329,7 +329,7 @@
                             <span class="material-icons-round">event_busy</span>
                             <input type="date" id="leave-end" required>
                         </div>
-                        <button type="submit" class="btn secondary-btn" id="submit-leave-btn">
+                        <button type="button" onclick="window.handleLeaveSubmit()" class="btn secondary-btn" id="submit-leave-btn">
                             <span class="material-icons-round">send</span> İzin Talebi Gönder
                         </button>
                     </form>
@@ -357,7 +357,7 @@
             <div id="wrk-tab-overtime" class="tab-content">
                 <section class="leave-request-section glass-panel">
                     <h3><span class="material-icons-round">more_time</span> Mesai Talep Et</h3>
-                    <form id="overtime-form" onsubmit="event.preventDefault(); window.handleOvertimeSubmit();">
+                    <form id="overtime-form">
                         <label class="date-label">Mesai Tarihi</label>
                         <div class="input-group dark">
                             <span class="material-icons-round">calendar_today</span>
@@ -376,7 +376,7 @@
                                 <option value="will_not_stay">Kalmayacağım</option>
                             </select>
                         </div>
-                        <button type="submit" class="btn secondary-btn" id="submit-overtime-btn">
+                        <button type="button" onclick="window.handleOvertimeSubmit()" class="btn secondary-btn" id="submit-overtime-btn">
                             <span class="material-icons-round">send</span> Mesai Talebi Gönder
                         </button>
                     </form>
@@ -391,7 +391,7 @@
             <div id="wrk-tab-materials" class="tab-content">
                 <section class="glass-panel">
                     <h3><span class="material-icons-round">inventory_2</span> Eksik Malzeme Bildir</h3>
-                    <form id="material-form" onsubmit="event.preventDefault(); window.handleMaterialSubmit();">
+                    <form id="material-form">
                         <div class="input-group dark">
                             <span class="material-icons-round">search</span>
                             <input type="text" id="material-name" placeholder="Eksik malzeme adı" required>
@@ -408,7 +408,7 @@
                             </label>
                             <img id="mat-image-preview" class="image-preview" style="display:none">
                         </div>
-                        <button type="submit" class="btn primary-btn" id="submit-material-btn">
+                        <button type="button" onclick="window.handleMaterialSubmit()" class="btn primary-btn" id="submit-material-btn">
                             <span class="material-icons-round">send</span> Talep Gönder
                         </button>
                     </form>

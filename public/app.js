@@ -269,6 +269,10 @@ window.handleAddTaskSubmit = async function() {
     const worker = document.getElementById('worker-select').value;
     const priority = document.querySelector('input[name="priority"]:checked').value;
     const file = taskImageInput ? taskImageInput.files[0] : null;
+    if (!title || !worker) {
+        showToast('Lütfen görev başlığı ve usta seçiniz.', 'warning');
+        return;
+    }
     if (title && worker) {
         submitTaskBtn.disabled = true;
         submitTaskBtn.innerHTML = '<span class="material-icons-round spinning">sync</span> Yükleniyor...';
@@ -288,7 +292,10 @@ window.handleLeaveSubmit = async function() {
     const btn = document.getElementById('submit-leave-btn');
     const start = document.getElementById('leave-start').value;
     const end = document.getElementById('leave-end').value;
-    if (!start || !end) return;
+    if (!start || !end) {
+        showToast('Lütfen başlangıç ve bitiş tarihlerini seçiniz.', 'warning');
+        return;
+    }
     btn.disabled = true;
     btn.innerHTML = '<span class="material-icons-round spinning">sync</span> Gönderiliyor...';
     try {
@@ -321,7 +328,10 @@ window.handleOvertimeSubmit = async function() {
     const date = document.getElementById('overtime-date').value;
     const reason = document.getElementById('overtime-reason').value;
     const decision = document.getElementById('overtime-decision').value;
-    if (!date) return;
+    if (!date) {
+        showToast('Lütfen mesai tarihi seçiniz.', 'warning');
+        return;
+    }
     btn.disabled = true;
     btn.innerHTML = '<span class="material-icons-round spinning">sync</span> Gönderiliyor...';
     try {
@@ -357,7 +367,10 @@ window.handleMaterialSubmit = async function() {
     const btn = document.getElementById('submit-material-btn');
     const name = document.getElementById('material-name').value.trim();
     const desc = document.getElementById('material-desc').value.trim();
-    if (!name) return;
+    if (!name) {
+        showToast('Lütfen malzeme adını yazınız.', 'warning');
+        return;
+    }
     btn.disabled = true;
     btn.innerHTML = '<span class="material-icons-round spinning">sync</span> Gönderiliyor...';
 
@@ -404,7 +417,10 @@ window.handleDocsSubmit = async function() {
     const title = document.getElementById('doc-title').value.trim();
     const fileInput = document.getElementById('doc-file');
     const file = fileInput.files[0];
-    if (!title || !file) return;
+    if (!title || !file) {
+        showToast('Lütfen döküman başlığı ve dosyası seçiniz.', 'warning');
+        return;
+    }
 
     btn.disabled = true;
     btn.innerHTML = '<span class="material-icons-round spinning">sync</span> Yükleniyor...';
